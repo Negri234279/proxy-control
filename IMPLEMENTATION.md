@@ -323,53 +323,103 @@ mapear `ValidationError → 400`, `NotFoundError → 404`, `ProviderError → 50
 
 ## 9. Infra / Docker
 
-Crear `infra/` en la raíz:
+Dos entornos de primera clase: **dev** (todo autocontenido en local) y **prod**
+(integrado con el core de `pi-infra`). Sigue el patrón de `apps/wake-lan-app` (sin
+subnivel `prod` en pi-infra) y la observabilidad por-app de `powerlog`.
+
+**Layout del repo** (fuente de verdad):
 
 ```
 infra/
-  Dockerfile
-  dev/      docker-compose.yml   .env.example
-  staging/  docker-compose.yml   .env.example
-  prod/     docker-compose.yml   .env.example
-  observability/
-    docker-compose.yml
+  Dockerfile                 # ✅ HECHO — multi-stage Node 24 (base→deps→build→prod-deps→runtime + dev)
+  dev/
+    compose.yml              # stack local COMPLETO (ver 9.1)
+    .env.example
+  prod/
+    compose.yml              # app + su prometheus/loki/alloy (ver 9.2); monta ./observability
+    proxy-control.env.example
+    scrape.d/                # targets de scrape extra por-entorno (opcional)
+  observability/             # ÚNICA fuente de configs obs (la monta prod; el sync la sube)
     prometheus/prometheus.yml
+    prometheus/rules/proxy-control-alerts.yml
+    loki/loki-config.yaml
     alloy/config.alloy
-    alertmanager/alertmanager.yml
-    grafana/ (provisioning + dashboards)
+    alertmanager/alertmanager.yml           # opcional (Discord propio)
+    grafana/
+      provisioning/datasources/datasources.yaml   # apunta la Grafana del core a proxy-control-{prometheus,loki}
+      provisioning/dashboards/dashboards.yaml
+      dashboards/*.json
+scripts/sync-pi-infra.sh     # ✅ HECHO — contrato de sync a pi-infra (ver 9.3)
+.github/workflows/sync-pi-infra.yml   # abre PR a pi-infra y auto-merge (ver 9.3)
+.github/workflows/docker-publish.yml  # build+push de la imagen (negrii/proxy-control:latest)
 ```
 
-- [ ] `infra/Dockerfile` **multi-stage**: `base` (node:22-alpine) → `deps` → `build`
-  (`astro build`) → `prod-deps` (`npm ci --omit=dev`) → `runtime` (copia `dist/` +
-  node_modules prod, `CMD node ./dist/server/entry.mjs`) + `dev` (hot reload por volumen).
-- [ ] compose por entorno: puertos **dev libre / staging 4322 / prod 4321**; inyectan
-  `DATABASE_URL` y secretos por env; **red bridge** (no host — solo HTTP saliente).
-  El contenedor debe alcanzar NPM, Cloudflare (internet), Mikrotik y pgbouncer.
-- [ ] Ejecutar migraciones en el arranque del entorno (entrypoint) o como job aparte.
-- [ ] `infra/observability/`: Prometheus scrapea `proxy-control:PORT/metrics`; Alloy
-  recoge logs; Alertmanager con reglas básicas (app down, tasa de errores de reconcile);
-  Grafana con datasource + dashboard inicial.
-- [ ] Scripts `docker:dev|staging|prod` en `package.json` apuntando a cada compose.
+### 9.1 Dev — stack completo sin pgbouncer
+`infra/dev/compose.yml` **autocontenido**, redes propias (no toca el core):
+- [ ] `proxy-control` (target `dev` del Dockerfile, hot reload por volumen), `PORT 4321`.
+- [ ] `postgres:16-alpine` **directo, SIN pgbouncer** (no necesario en dev). La app
+  apunta `DATABASE_URL` a `postgres:5432` con `search_path=proxy_control`.
+- [ ] Observabilidad local COMPLETA: `grafana` (:3000), `prometheus`, `loki`, `alloy`
+  (lee `/var/run/docker.sock` para logs). Grafana con provisioning apuntando al
+  prometheus/loki locales para probar dashboards antes de subirlos.
+- [ ] Migraciones al arranque (entrypoint o job `db:migrate`).
+
+### 9.2 Prod — app + obs propia, DB/pgbouncer/Grafana del core
+`infra/prod/compose.yml`: **NO despliega** postgres, pgbouncer ni grafana (los pone el
+core). Servicios prefijados `proxy-control-`:
+- [ ] `proxy-control` (imagen `negrii/proxy-control:latest`, `pull_policy: always`,
+  label watchtower). Runtime → **`pgbouncer:6432`**; migraciones → **`postgres:5432`**
+  directo (bypass del pooler). Se expone por el **NPM del core** (no publica puertos).
+- [ ] `proxy-control-prometheus`, `proxy-control-loki`, `proxy-control-alloy` montando
+  `./observability/...` (tras el sync; en el repo es `../observability`, ver 9.3).
+- [ ] (Opcional) `proxy-control-alertmanager` con su propio webhook de Discord.
+- [ ] Redes **externas** del core: `db` (postgres/pgbouncer) y `monitoring` (para que la
+  Grafana del core consulte `proxy-control-prometheus`/`-loki` como datasources).
+  Ambas las crea `pi-infra/scripts/create-network.sh` — solo se **unen**, no se crean.
+- [ ] Secretos en `proxy-control.env` **solo en la Pi** (gitignored; `*.env.example` sí
+  se versiona). Provisión del rol+DB en el Postgres del core vía
+  `apps/proxy-control/postgres/provision.env` (patrón del core).
+
+### 9.3 Sync a pi-infra (por PR) — sin subnivel prod
+- [x] `scripts/sync-pi-infra.sh` adaptado a `proxy-control` (contrato):
+  - `infra/prod/` (menos `observability/`) → `apps/proxy-control/` (**sin `/prod`**).
+  - Reescribe en el compos aterrizado `../observability` → `./observability`.
+  - `infra/observability/` (menos `grafana/`) → `apps/proxy-control/observability/`.
+  - dashboards `*.json` (menos `postgresql-9628.json`) → `core/grafana/dashboards/proxy-control/`.
+  - datasources → `core/grafana/provisioning/datasources/proxy-control.yml`.
+  - Cablea el include raíz `- apps/proxy-control/compose.yml` (idempotente).
+- [ ] `.github/workflows/sync-pi-infra.yml`: en push a `main` que toque `infra/**` o el
+  script, checkout de proxy-control + pi-infra (`Negri234279/pi-infra` con
+  `PI_INFRA_SYNC_TOKEN`), ejecuta el script, abre PR (`create-pull-request`) y auto-merge.
+  Branch `sync/proxy-control-infra`. (Modelar sobre el workflow de powerlog.)
+
+- [ ] Scripts `docker:dev` / `docker:prod` en `package.json`
+  (`docker compose -f infra/dev/compose.yml ...` / `-f infra/prod/compose.yml ...`).
+  Prod normalmente se levanta desde el ROOT compose de pi-infra tras el sync.
 
 ---
 
 ## 10. Matriz de variables de entorno
 
-| Variable                | dev | staging | prod | Notas                                  |
-| ----------------------- | --- | ------- | ---- | -------------------------------------- |
-| `DATABASE_URL`          | ✓   | ✓       | ✓    | pgbouncer, `search_path=proxy_control` |
-| `NPM_BASE_URL`          | ✓   | ✓       | ✓    |                                        |
-| `NPM_EMAIL/PASSWORD`    | ✓   | ✓       | ✓    | para `POST /api/tokens`                |
-| `CLOUDFLARE_API_TOKEN`  | ✓   | ✓       | ✓    | Zone.DNS: Edit                         |
-| `CLOUDFLARE_ZONE_ID`    | ✓   | ✓       | ✓    |                                        |
-| `MIKROTIK_BASE_URL`     | ✓   | ✓       | ✓    | `https://192.168.88.1` (443)           |
-| `MIKROTIK_USER/PASSWORD`| ✓   | ✓       | ✓    | usuario con `rest-api`                 |
-| `MIKROTIK_TLS_INSECURE` | ✓   | ?       | ?    | si cert self-signed                    |
-| `NPM_INTERNAL_IP`       | ✓   | ✓       | ✓    | target de DNS estático privado         |
-| `AUTH_ENABLED`          | ✓   | ✓       | ✓    | false solo-LAN                         |
-| `AUTH_USER / *_HASH`    | ✓   | ✓       | ✓    |                                        |
-| `SESSION_SECRET`        | ✓   | ✓       | ✓    |                                        |
-| `HOST / PORT`           | ✓   | ✓       | ✓    | 4322 staging / 4321 prod               |
+| Variable                | dev | prod | Notas                                                        |
+| ----------------------- | --- | ---- | ------------------------------------------------------------ |
+| `DATABASE_URL` (runtime)| ✓   | ✓    | **dev**: `postgres:5432` directo. **prod**: `pgbouncer:6432`. Ambos `search_path=proxy_control` |
+| `MIGRATION_DATABASE_URL`| –   | ✓    | prod: `postgres:5432` directo (bypass del pooler para migrar)|
+| `NPM_BASE_URL`          | ✓   | ✓    |                                                              |
+| `NPM_EMAIL/PASSWORD`    | ✓   | ✓    | para `POST /api/tokens`                                      |
+| `CLOUDFLARE_API_TOKEN`  | ✓   | ✓    | Zone.DNS: Edit                                               |
+| `CLOUDFLARE_ZONE_ID`    | ✓   | ✓    |                                                              |
+| `MIKROTIK_BASE_URL`     | ✓   | ✓    | `https://192.168.88.1` (443)                                 |
+| `MIKROTIK_USER/PASSWORD`| ✓   | ✓    | usuario con `rest-api`                                       |
+| `MIKROTIK_TLS_INSECURE` | ✓   | ?    | si cert self-signed                                          |
+| `NPM_INTERNAL_IP`       | ✓   | ✓    | target de DNS estático privado                               |
+| `AUTH_ENABLED`          | ✓   | ✓    | false solo-LAN                                               |
+| `AUTH_USER / *_HASH`    | ✓   | ✓    |                                                              |
+| `SESSION_SECRET`        | ✓   | ✓    |                                                              |
+| `HOST / PORT`           | ✓   | ✓    | PORT 4321                                                    |
+
+> Nota dev: al no haber pgbouncer, el runtime puede usar prepared statements sin
+> problema. En prod, con pgbouncer en `transaction` mode, evitarlos (ver Fase 3).
 
 ---
 

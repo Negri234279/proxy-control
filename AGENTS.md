@@ -300,37 +300,46 @@ MIKROTIK_PASSWORD=...
 
 ## Docker / Infra
 
-Todo lo de despliegue vive en **`infra/`** en la raíz del repo, con **una subcarpeta por
-entorno** y el **`Dockerfile` multi-stage** compartido en `infra/`:
+Todo lo de despliegue vive en **`infra/`** en la raíz, con el **`Dockerfile` multi-stage
+(Node 24)** compartido. Dos entornos: **dev** (todo autocontenido en local) y **prod**
+(integrado con el core de `pi-infra`). Sigue el patrón de `apps/wake-lan-app` (sin
+subnivel `prod` en pi-infra) y la observabilidad por-app de `powerlog`.
 
 ```
 infra/
-  Dockerfile              # multi-stage (base → deps → build → prod-deps → runtime, + dev)
-  dev/      docker-compose.yml   .env.example
-  staging/  docker-compose.yml   .env.example   # PORT 4322
-  prod/     docker-compose.yml   .env.example   # PORT 4321
-  observability/          # Grafana, Alloy, Prometheus, Alertmanager (stack aparte)
+  Dockerfile              # multi-stage Node 24 (base → deps → build → prod-deps → runtime, + dev)
+  dev/    compose.yml  .env.example      # stack LOCAL completo (ver abajo)
+  prod/   compose.yml  proxy-control.env.example  scrape.d/   # app + obs propia
+  observability/        # única fuente de configs (prometheus, loki, alloy, alertmanager, grafana/*)
+scripts/sync-pi-infra.sh                 # sube prod + obs a pi-infra por PR
+.github/workflows/sync-pi-infra.yml      # abre PR a pi-infra y auto-merge
 ```
 
 ```
-docker compose -f infra/dev/docker-compose.yml up --build          # o: npm run docker:dev
-docker compose -f infra/staging/docker-compose.yml up --build -d    # o: npm run docker:staging
-docker compose -f infra/prod/docker-compose.yml up --build -d        # o: npm run docker:prod
+docker compose -f infra/dev/compose.yml up --build     # o: npm run docker:dev
+docker compose -f infra/prod/compose.yml up --build -d   # o: npm run docker:prod (normalmente vía pi-infra)
 ```
 
-- **Etapas** del `Dockerfile`: `base` (Node 22 Alpine) → `deps` (deps completas) →
-  `build` (Astro) → `prod-deps` (`npm ci --omit=dev`) → `runtime` (imagen final:
-  `dist/` + node_modules de prod, arranca `node ./dist/server/entry.mjs`) y `dev`
-  (hot reload con el código montado por volumen).
-- El servidor SSR corre con `@astrojs/node` standalone, escuchando en `HOST`/`PORT`.
-- **No requiere `network_mode: host`**: la app solo hace peticiones HTTP/HTTPS salientes
-  a NPM, Cloudflare, Mikrotik y Postgres (red bridge normal). Basta con que el contenedor
-  alcance esos hosts en la LAN.
-- Persistencia en **Postgres compartido del core** (no volumen local). Los secretos
-  (tokens de CF/NPM/Mikrotik, `DATABASE_URL`) por variables de entorno / secrets del env.
-- La **observabilidad** (Grafana, Alloy, Prometheus, Alertmanager) se despliega desde
-  `infra/observability/`; la app solo expone `/metrics` y `/health` para que Alloy/Prometheus
-  la scrapeen.
+- **Dev — stack completo, sin pgbouncer.** `infra/dev/compose.yml` es autocontenido y no
+  toca el core: app (target `dev`, hot reload), **`postgres` directo (sin pgbouncer, no
+  necesario en dev)** y observabilidad local COMPLETA (**Grafana :3000, Prometheus, Loki,
+  Alloy**). `DATABASE_URL` → `postgres:5432`.
+- **Prod — DB/pgbouncer/Grafana del core.** `infra/prod/compose.yml` **no** despliega
+  postgres, pgbouncer ni grafana: usa los del core uniéndose a sus redes externas **`db`**
+  (postgres/pgbouncer) y **`monitoring`** (para que la Grafana del core consulte
+  `proxy-control-prometheus`/`-loki`). La app trae su **propia** obs (`proxy-control-{prometheus,
+  loki,alloy}`). Runtime → `pgbouncer:6432`; migraciones → `postgres:5432` directo.
+  Se expone por el **NPM del core** (no publica puertos). Secretos en `proxy-control.env`
+  solo en la Pi (`*.env.example` versionado).
+- **Sync a pi-infra (por PR), sin subnivel prod.** `scripts/sync-pi-infra.sh` espeja
+  `infra/prod/` → `apps/proxy-control/` (reescribiendo `../observability` → `./observability`),
+  `infra/observability/` (menos grafana) → `apps/proxy-control/observability/`, dashboards →
+  `core/grafana/dashboards/proxy-control/` y datasources → `core/grafana/provisioning/
+  datasources/proxy-control.yml`, y cablea el include raíz. Lo dispara el workflow
+  `sync-pi-infra.yml` al hacer push a `main`.
+- El servidor SSR corre con `@astrojs/node` standalone en `HOST`/`PORT` (4321). **No usa
+  `network_mode: host`**: solo HTTP/HTTPS saliente (NPM, Cloudflare, Mikrotik, Postgres).
+- La app solo expone `/metrics` y `/health`; su Prometheus los scrapea y Alloy recoge logs.
 
 ## Documentación
 
