@@ -177,21 +177,23 @@ infra/                          # Fase 9
 
 ---
 
-## 4. Providers (clientes de integración)
+## 4. Providers (clientes de integración) — ✅ HECHO
 
 Cada uno es un módulo aislado sin lógica de negocio. Todos lanzan `ProviderError`
 en fallo (mapeado a HTTP 502).
 
-### 4.1 `providers/npm.ts`
-- [ ] `getToken()` → `POST {NPM_BASE_URL}/api/tokens` con `{ identity, secret }`;
-  cachear el token con su expiración.
-- [ ] `listProxyHosts()` → `GET /api/nginx/proxy-hosts` (Bearer). Devuelve
-  `{ id, domain_names[], forward_scheme, forward_host, forward_port, enabled, ... }`.
-- [ ] `listCertificates()` → `GET /api/nginx/certificates`. Se usa para localizar el
-  **cert wildcard** (`nice_name`/`domain_names` que casen con `*.negri.es` / `negri.es`)
-  en altas privadas.
-- [ ] `createProxyHost(payload)` → `POST /api/nginx/proxy-hosts`. Construir el body con
-  el mapeo exacto de opciones:
+- [x] Clases de error en `src/server/errors/` (una por archivo + barrel `index.ts`):
+  `ValidationError` (400, `fields`), `NotFoundError` (404), `ProviderError` (502,
+  `provider` + `status`).
+- [x] Helper `providers/http.ts`: `fetchJson()` (usado por NPM y Cloudflare) que
+  convierte fallos de red / respuestas no-2xx en `ProviderError`.
+
+### 4.1 `providers/npm.ts` — [x]
+- [x] `getToken()` → `POST {NPM_BASE_URL}/api/tokens` con `{ identity, secret }`;
+  token cacheado (renovado 60s antes de expirar).
+- [x] `listProxyHosts()` → `GET /api/nginx/proxy-hosts` (Bearer).
+- [x] `listCertificates()` → `GET /api/nginx/certificates` (para casar el wildcard).
+- [x] `createProxyHost(input)` → `POST /api/nginx/proxy-hosts`. Mapeo exacto de opciones:
   ```jsonc
   {
     "domain_names": ["app.negri.es"],
@@ -217,30 +219,34 @@ en fallo (mapeado a HTTP 502).
   > SSL — **Público**: `certificate_id: "new"` con `dns_challenge: false`, es decir el
   > comportamiento por defecto de NPM al pedir un cert nuevo con Let's Encrypt.
   > **Privado**: **DNS-01**, reutiliza el cert wildcard `*.negri.es` ya presente (no emite).
-- [ ] `deleteProxyHost(id)` → `DELETE /api/nginx/proxy-hosts/:id`.
+  >
+  > Implementado: `certificate_id: 'new'` → `meta.letsencrypt_agree: true` y
+  > `dns_challenge` según input; con id numérico (wildcard) no se piden metadatos de emisión.
+- [x] `deleteProxyHost(id)` → `DELETE /api/nginx/proxy-hosts/:id`.
 - Ref: https://nginxproxymanager.com/api/
 
-### 4.2 `providers/cloudflare.ts`
-- [ ] `findRecord(name)` → `GET /client/v4/zones/{ZONE}/dns_records?name={name}`.
-- [ ] `createRecord({ name, content, type, proxied })` →
-  `POST /client/v4/zones/{ZONE}/dns_records` con `{ type, name, content, proxied: true, ttl: 1 }`.
-- [ ] `deleteRecord(id)` → `DELETE /client/v4/zones/{ZONE}/dns_records/{id}`.
-- Auth: header `Authorization: Bearer {CLOUDFLARE_API_TOKEN}`.
+### 4.2 `providers/cloudflare.ts` — [x]
+- [x] `findRecord(name)` → `GET /zones/{ZONE}/dns_records?name={name}` (primer match o null).
+- [x] `createRecord({ name, content, type, proxied })` →
+  `POST /zones/{ZONE}/dns_records` con `{ type, name, content, proxied, ttl: 1 }`.
+- [x] `deleteRecord(id)` → `DELETE /zones/{ZONE}/dns_records/{id}`.
+- [x] Auth `Bearer {CLOUDFLARE_API_TOKEN}`; valida el envelope `success/errors/result`.
 - Ref: https://developers.cloudflare.com/api/
 
-### 4.3 `providers/mikrotik.ts` (REST v7 sobre www-ssl 443)
-- [ ] Cliente HTTPS con **Basic auth** (`MIKROTIK_USER:MIKROTIK_PASSWORD`).
-  Si cert self-signed: `Agent({ rejectUnauthorized: !MIKROTIK_TLS_INSECURE })`.
-- [ ] `listStaticDns()` → `GET {BASE}/rest/ip/dns/static`.
-- [ ] `createStaticDns({ name, address })` → `PUT {BASE}/rest/ip/dns/static`
-  con `{ name, address, type: 'A' }` (name = hostname, address = IP interna de NPM).
-- [ ] `deleteStaticDns(id)` → `DELETE {BASE}/rest/ip/dns/static/{id}`.
+### 4.3 `providers/mikrotik.ts` (REST v7 sobre www-ssl 443) — [x]
+- [x] Cliente `node:https` con **Basic auth** y `Agent({ rejectUnauthorized:
+  !MIKROTIK_TLS_INSECURE })` (para el cert self-signed).
+- [x] `listStaticDns()` → `GET {BASE}/rest/ip/dns/static`.
+- [x] `createStaticDns({ name, address })` → `PUT {BASE}/rest/ip/dns/static`
+  con `{ name, address, type: 'A' }`.
+- [x] `deleteStaticDns(id)` → `DELETE {BASE}/rest/ip/dns/static/{id}` (id `.id` url-encoded).
 - Ref: https://help.mikrotik.com/docs/display/ROS/REST+API
 - **Fallback documentado**: si www-ssl no fuese viable, usar api-ssl (8729) con una
   librería de la API binaria; encapsular igualmente tras la misma interfaz del módulo.
 
-- [ ] **Hecho** cuando: un script de humo por proveedor lista recursos reales
-  (proxy hosts, DNS records, static DNS) sin errores de auth/TLS.
+- [x] `tsc --noEmit` limpio con los 3 providers + helper + errores.
+- [ ] **Pendiente de humo real**: listar recursos (proxy hosts, DNS records, static DNS)
+  contra NPM/CF/Mikrotik reales sin errores de auth/TLS (cuando haya credenciales).
 
 ---
 
