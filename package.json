@@ -12,20 +12,33 @@
         "start": "node ./dist/server/entry.mjs",
         "astro": "astro",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "db:generate": "drizzle-kit generate",
+        "db:migrate": "tsx src/server/db/migrate.ts",
+        "db:studio": "drizzle-kit studio",
+        "docker:dev": "docker compose -f infra/dev/compose.yml up --build",
+        "docker:prod": "docker compose -f infra/prod/compose.yml up --build -d"
     },
     "dependencies": {
         "@astrojs/node": "11.0.3",
         "@astrojs/preact": "6.0.2",
+        "@node-rs/argon2": "2.0.2",
         "@tailwindcss/vite": "4.3.3",
         "astro": "^7.1.6",
+        "drizzle-orm": "0.45.2",
+        "pg": "8.22.0",
         "preact": "10.29.8",
-        "tailwindcss": "4.3.3"
+        "prom-client": "15.1.3",
+        "tailwindcss": "4.3.3",
+        "zod": "4.4.3"
     },
     "devDependencies": {
         "@types/node": "24.13.3",
+        "@types/pg": "8.20.3",
+        "drizzle-kit": "0.31.10",
         "prettier": "3.9.6",
         "prettier-plugin-astro": "0.14.1",
-        "prettier-plugin-tailwindcss": "0.8.1"
+        "prettier-plugin-tailwindcss": "0.8.1",
+        "tsx": "4.23.4"
     }
 }

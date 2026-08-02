@@ -1,0 +1,23 @@
+# Build context: la raíz del repo (docker build -f infra/Dockerfile .).
+node_modules
+dist
+.astro
+.git
+.github
+.vscode
+.claude
+.idea
+
+# Infra y scripts no forman parte de la imagen de la app.
+infra
+scripts
+
+# Secretos y entorno local.
+.env
+.env.*
+!.env.example
+!*.env.example
+
+# Docs y metadatos.
+*.md
+data

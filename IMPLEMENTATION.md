@@ -60,22 +60,25 @@ El repo ya tiene Astro 7 + Preact + Tailwind 4 (`astro.config.mjs`, `package.jso
 Completar la base:
 
 ```bash
-# Dependencias runtime
-npm i drizzle-orm pg prom-client
+# Dependencias runtime (INSTALADAS)
+npm i drizzle-orm pg prom-client zod @node-rs/argon2
 npm i -D drizzle-kit @types/pg tsx
-
-# (Auth) hashing de password
-npm i @node-rs/argon2   # o bcrypt si se prefiere
 ```
 
-- [ ] Verificar `astro.config.mjs`: `output: 'server'`, adaptador `@astrojs/node`
-  standalone, integración Preact (`jsxImportSource: 'preact'`), `@tailwindcss/vite`.
-- [ ] `.prettierrc` con: 4 espacios, sin `;`, comillas simples, `trailingComma: all`,
-  `printWidth: 120`, plugins `prettier-plugin-astro` + `prettier-plugin-tailwindcss`.
-- [ ] `.env.example` en la raíz con todas las variables de la Fase 1 (sin valores).
-- [ ] `.gitignore`: `.env`, `.env.*` (excepto `.env.example`), `dist/`, `node_modules/`.
-- [ ] Scripts en `package.json`: `dev`, `build`, `preview`, `db:generate`, `db:migrate`,
-  `format`, `docker:dev`, `docker:staging`, `docker:prod`.
+- [x] Verificar `astro.config.mjs`: `output: 'server'`, adaptador `@astrojs/node`
+  standalone, integración Preact (`jsxImportSource: 'preact'` en tsconfig), `@tailwindcss/vite`. ✅ ya correcto
+- [x] `.prettierrc` con: 4 espacios, sin `;`, comillas simples, `trailingComma: all`,
+  `printWidth: 120`, plugins `prettier-plugin-astro` + `prettier-plugin-tailwindcss`. ✅ ya correcto
+- [x] `.env.example` en la raíz con todas las variables (dev = Postgres directo; prod = pgbouncer).
+- [x] `.gitignore`: `.env`, `.env.*` (excepto `*.env.example`). Añadido `.dockerignore`.
+- [x] Scripts en `package.json`: `db:generate`, `db:migrate`, `db:studio`,
+  `docker:dev`, `docker:prod` (además de `dev/build/preview/format`).
+- [x] `npm run build` y `npm run format` verdes tras el bootstrap.
+
+> **Nota**: `zod` para validar env (Fase 3) y `@node-rs/argon2` para el hash de auth
+> (Fase 8) — ambos con prebuilts para win32-x64 (dev) y linux-{x64,arm64}-musl (Alpine/Pi).
+> La estructura de carpetas de abajo se crea a medida que cada fase añade sus ficheros
+> (no se crean directorios vacíos).
 
 **Estructura de carpetas objetivo**
 
