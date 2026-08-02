@@ -1,22 +1,352 @@
-## Development
+# proxy-control
 
-When starting the dev server, use background mode:
+Panel web para **gobernar los dominios de Nginx Proxy Manager (NPM)** que corre en la
+misma red, distinguiendo dominios **públicos** y **privados**, y manteniéndolos
+sincronizados con los sistemas que resuelven cada tipo:
+
+- **Público** → se registra primero en **Cloudflare** (DNS) y luego en **NPM**.
+- **Privado** → se registra en el **Mikrotik RB750Gr3** (RouterOS 7.23.2, DNS estático)
+  y luego en **NPM**.
+
+La app lee los dominios de NPM, muestra en una tabla su estado y **de forma visual**
+si están activos en Cloudflare (públicos) o en el Mikrotik (privados), y ofrece
+acciones de **reconciliación** cuando hay divergencias.
+
+> **Nota**: `CLAUDE.md` es un symlink a este fichero (`AGENTS.md`). Editar aquí actualiza
+> ambos.
+
+> **Decisiones** (plan detallado en `IMPLEMENTATION.md`):
+>
+> **Confirmadas por el usuario:**
+>
+> - **Mikrotik**: **REST API de RouterOS 7** sobre **www-ssl (443)** →
+>   `/rest/ip/dns/static`. (Disponibles también api 8728 / api-ssl 8729 como fallback.)
+> - **Reconciliación**: **solo bajo demanda** (botón). El polling de la UI es de lectura,
+>   no auto-repara.
+>
+> **Defaults razonados (vetar antes de implementar si procede):**
+>
+> 1. **DB**: Postgres compartido del core (`dbshared` + **pgbouncer**), esquema propio,
+>    con **Drizzle** (ORM + migraciones).
+> 2. **Cloudflare**: registro DNS **A/CNAME (proxied)** vía API token.
+> 3. **Público/privado**: **metadato en nuestra DB** (elegido al crear; los dominios
+>    preexistentes en NPM quedan `sin clasificar` hasta asignarles tipo).
+> 4. **Auth**: login simple de un usuario (credencial por env + cookie de sesión vía
+>    middleware), desactivable con `AUTH_ENABLED=false` para uso solo-LAN.
+
+## Reglas de trabajo (IMPORTANTE)
+
+- **Planificar primero, actuar después.** Ante cualquier tarea no trivial, primero
+  propón un plan y espera confirmación antes de escribir código.
+- **Nunca hagas commit.** El usuario hace los commits manualmente. No ejecutes
+  `git commit`, `git push` ni operaciones que reescriban el historial.
+- Ante dudas de diseño o requisitos, **pregunta** en lugar de asumir.
+- Para UI usar los recursos disponibles del entorno: plugin **ux-engine**
+  (diseñar wireframe/spec antes de codear con `ux-design`, revisar con `ux-review`)
+  y las skills de diseño frontend (`design-taste-frontend`, `high-end-visual-design`).
+  Diseñar la UI **antes** de implementarla.
+
+## Normas de código (clean code)
+
+Aplican a todo el código nuevo. El formateo lo garantiza **Prettier**; estas normas
+cubren estructura y estilo que Prettier no impone.
+
+**Estructura / archivos**
+
+- Un archivo, una responsabilidad. Extraer a archivos propios los errores, utilidades,
+  constantes y cualquier cosa que no sea la función principal del archivo.
+- Errores en `src/server/errors/` (una clase por archivo, barrel en `index.ts`).
+- Validaciones divididas por unidad (`src/server/validation/{hostname,ip,domain}.ts`).
+- Integraciones externas aisladas en `src/server/providers/{npm,cloudflare,mikrotik}.ts`
+  (un cliente por proveedor, sin lógica de negocio dentro).
+- Constantes/metadata de presentación del front en `src/lib/` (p. ej. `domain-status.ts`).
+
+**Control de flujo**
+
+- `if` en una sola línea SOLO cuando el cuerpo es un `return` (guard clause):
+  `if (!value) return null`.
+- Cualquier otro `if` con cuerpo, `else`, `for` y bucles: siempre en bloque multilínea
+  con llaves. Nunca en una sola línea.
+- Preferir guard clauses y salidas tempranas frente al anidamiento.
+
+**Objetos**
+
+- Objetos literales nunca en una sola línea: una propiedad por línea, con trailing comma.
+
+**Front (Astro + Preact)**
+
+- Componentes atómicos: una única responsabilidad y la lógica mínima en cada uno.
+- Toda la lógica de estado de las islas Preact (`useState`, `useEffect`, etc.) se extrae
+  a **custom hooks** (`useXxx`) para mantener el componente declarativo.
+
+**Formateo**
+
+- Prettier 3 con `prettier-plugin-astro` y `prettier-plugin-tailwindcss`. Config en
+  `.prettierrc` (4 espacios, sin `;`, comillas simples, `trailingComma: all`, printWidth 120).
+- Ejecutar `npx prettier --write` al terminar cualquier cambio.
+
+## Stack
+
+- **Astro 7** (`^7.1.6`) con **SSR** para toda la lógica de backend.
+- **Preact 10** (`@astrojs/preact`) para los componentes interactivos (islas).
+  JSX configurado con `jsxImportSource: "preact"`.
+- **Tailwind CSS 4** vía `@tailwindcss/vite` (no PostCSS, no `tailwind.config`
+  clásico; configuración con `@theme` en CSS).
+- **Node 22+** (`engines.node >= 22.12.0`).
+- Adaptador SSR: **`@astrojs/node`** en modo `standalone` (`output: 'server'` en
+  `astro.config.mjs`). El acceso a NPM/Mikrotik/Cloudflare (HTTP/HTTPS) y a Postgres
+  requiere que el backend corra en Node en el servidor, no en edge.
+- **Persistencia: Postgres compartido** del core (`dbshared` a través de **pgbouncer**,
+  pool mode `transaction`), con un **esquema propio** de proxy-control. Migraciones
+  versionadas. *(Alternativa descartada por defecto: SQLite en volumen.)*
+- **Observabilidad**: métricas **Prometheus** vía `prom-client` en `/metrics`, logs
+  estructurados JSON a stdout recogidos por **Grafana Alloy** → **Prometheus** (y logs),
+  visualización en **Grafana** y alertas por **Alertmanager**. El stack se despliega
+  aparte en `infra/` (la app solo se instrumenta y expone `/metrics` + `/health`).
+- **Prettier** con plugins de Astro y Tailwind para el formateo (ver "Normas de código").
+
+## Arquitectura
+
+```
+Navegador (Preact islands)
+      │  fetch()
+      ▼
+Endpoints SSR de Astro (src/pages/api/*.ts)   ← toda la lógica de integración vive aquí
+      │
+      ├─ Providers (src/server/providers/)
+      │     ├─ npm.ts         → API de Nginx Proxy Manager (leer/crear proxy hosts)
+      │     ├─ cloudflare.ts  → API de Cloudflare (registros DNS de dominios públicos)
+      │     └─ mikrotik.ts    → REST API RouterOS 7 (/ip/dns/static, dominios privados)
+      │
+      ├─ Reconciliación (src/server/reconcile/)  → compara estado deseado vs real
+      └─ Persistencia (src/server/db/)           → Postgres (metadata y estado deseado)
+```
+
+- Toda la lógica de red/integración **solo** se ejecuta en el servidor (SSR).
+  Nunca en el cliente. Los tokens/credenciales viven en variables de entorno.
+- Los componentes Preact son islas hidratadas que llaman a los endpoints por `fetch`.
+- **Fuente de verdad**: NPM es la lista de dominios; nuestra DB guarda el *tipo*
+  (público/privado), el *estado deseado* y el resultado de la última reconciliación.
+
+## API (SSR)
+
+Rutas en `src/pages/api/`. Todas devuelven JSON. El mapeo de errores vive en
+`src/server/http/error-response.ts` (`ValidationError` → 400 con `fields`,
+`NotFoundError` → 404, `ProviderError` → 502, resto → 500).
+
+| Método | Ruta                          | Descripción                                                        |
+| ------ | ----------------------------- | ------------------------------------------------------------------ |
+| GET    | `/api/domains`                | Lista de dominios de NPM cruzados con metadata y estado de sync.   |
+| POST   | `/api/domains`                | Crea un dominio (público: Cloudflare→NPM; privado: Mikrotik→NPM).  |
+| PATCH  | `/api/domains/:id`            | Edita un dominio (tipo, upstream, flags).                          |
+| DELETE | `/api/domains/:id`            | Elimina el dominio (y opcionalmente su registro DNS asociado).     |
+| POST   | `/api/domains/:id/reconcile`  | Reconcilia un dominio (crea/repara lo que falte en CF o Mikrotik). |
+| GET    | `/api/domains/:id/status`     | Estado de sync de un dominio (NPM + CF/Mikrotik).                  |
+| POST   | `/api/reconcile`              | Reconcilia toda la flota.                                          |
+| GET    | `/api/status`                 | Estado de sync de toda la flota (para el polling de la tabla).     |
+| GET    | `/health`                     | Healthcheck (readiness de DB y proveedores).                       |
+| GET    | `/metrics`                    | Métricas Prometheus.                                               |
+
+> **CSRF**: Astro protege los métodos que mutan (`checkOrigin`, activo por defecto en
+> SSR). El front debe llamarlos con `fetch` desde el mismo origen — el navegador envía
+> el header `Origin` automáticamente. Las peticiones con `content-type: application/json`
+> también lo superan.
+
+## Modelo de datos
+
+Persistencia en **Postgres** (esquema propio `proxy_control`). NPM es la fuente de la
+lista de dominios; esta tabla guarda la clasificación y el estado deseado/observado.
+
+```jsonc
+// tabla: proxy_control.domains
+{
+  "id": "uuid",
+  "hostname": "app.negri.es",      // subdominio / proxy host en NPM
+  "visibility": "public",          // "public" | "private" | "unclassified"
+
+  // Destino que NPM proxifica
+  "forward_scheme": "http",        // "http" | "https"
+  "forward_host": "192.168.1.50",  // IP/host interno del servicio
+  "forward_port": 8080,
+
+  // Opciones del proxy host de NPM (defaults al crear)
+  "npm_options": {
+    "block_exploits": true,        // Block Common Exploits
+    "websockets": true,            // Websockets Support
+    "cache_assets": true,          // Cache Assets
+    "http2": true,                 // HTTP/2 Support
+    "hsts": true,                  // HSTS Enabled
+    "force_ssl": true              // Force SSL
+  },
+  "custom_locations": [],          // ubicaciones personalizadas (configurable)
+
+  // Política SSL (según visibility)
+  "ssl": {
+    "mode": "new",                 // public → "new" (LE por hostname)
+    //        "wildcard"           // private → cert wildcard existente (*.negri.es)
+    "certificate_id": null         // id del cert en NPM una vez asignado/emitido
+  },
+
+  // Registro DNS público (solo public)
+  "cloudflare": {
+    "record_type": "A",            // "A" | "CNAME"
+    "content": "203.0.113.10",     // IP pública (A) u host destino (CNAME)
+    "proxied": true                // naranja (proxied) vs gris (DNS-only)
+  },
+
+  "npm_proxy_id": 42,              // id del proxy host en NPM (null si aún no existe)
+  "cloudflare_record_id": "abc123",// id del registro DNS en CF (solo públicos)
+  "mikrotik_dns_id": "*1A",        // id de la entrada /ip/dns/static (solo privados)
+  "reconcile_state": "synced",     // "synced" | "drift" | "missing" | "error"
+  "last_reconciled_at": "2026-08-02T10:00:00Z",
+  "created_at": "2026-08-02T09:00:00Z",
+  "updated_at": "2026-08-02T09:30:00Z"
+}
+```
+
+> Nota: los dominios que ya existen en NPM pero no tienen fila aquí se muestran como
+> `unclassified` hasta que se les asigna tipo (público/privado) desde la app.
+> `npm_options`, `custom_locations` y `cloudflare.{record_type,proxied}` se guardan
+> como columnas JSONB; el resto como columnas tipadas.
+
+## Funcionalidades
+
+### 1. Tabla de dominios
+- Lee los dominios de **NPM** y los cruza con la metadata de nuestra DB.
+- Cada fila muestra: hostname, upstream, **tipo** (público/privado/sin clasificar) y,
+  **de forma visual**, si está activo en **Cloudflare** (público) o en el **Mikrotik**
+  (privado): estados `synced` (✔ verde/neón), `drift` (⚠ ámbar), `missing` (✖ rojo),
+  `checking` (spinner).
+- Acciones por fila: **reconciliar**, editar, eliminar.
+
+### 2. Alta de dominio
+
+Dominio base **`negri.es`** y subdominios **`*.negri.es`**. Orden estricto y rollback
+en fallo; si no se puede revertir, se deja `reconcile_state: 'error'`.
+
+**Público** (`negri.es` expuesto a internet):
+1. **Cloudflare** — crea registro DNS. Por defecto **A** → IP pública, **proxied**
+   (naranja), TTL auto. Configurable a **CNAME** y a **DNS-only** por dominio.
+2. **NPM** — crea el proxy host con los defaults de `npm_options` (ver abajo) y
+   **SSL: solicita un certificado nuevo de Let's Encrypt** para ese hostname.
+3. **DB** — persiste la metadata.
+
+**Privado** (`*.negri.es` solo resoluble en LAN):
+1. **Mikrotik** — crea entrada `/ip/dns/static` (name = hostname, address = IP interna
+   de NPM).
+2. **NPM** — crea el proxy host con los defaults de `npm_options` y **SSL: usa el
+   certificado wildcard existente** `*.negri.es` / `negri.es` (emitido por **DNS-01**).
+   No solicita cert nuevo.
+3. **DB** — persiste la metadata.
+
+**Opciones del proxy host de NPM aplicadas en todas las altas** (defaults):
+
+| Opción NPM             | Campo API NPM            | Default |
+| ---------------------- | ------------------------ | ------- |
+| Block Common Exploits  | `block_exploits`         | `true`  |
+| Websockets Support     | `allow_websocket_upgrade`| `true`  |
+| Cache Assets           | `caching_enabled`        | `true`  |
+| HTTP/2 Support         | `http2_support`          | `true`  |
+| HSTS Enabled           | `hsts_enabled`           | `true`  |
+| Force SSL              | `ssl_forced`             | `true`  |
+| Custom Locations       | `locations[]`            | `[]` (configurable) |
+
+**Política SSL:**
+- **Público** → `certificate: 'new'` en NPM: **el flujo estándar de NPM de "solicitar un
+  certificado nuevo" con Let's Encrypt** (sin DNS challenge → `dns_challenge: false`).
+- **Privado** → **DNS-01**: selecciona el `certificate_id` del wildcard `*.negri.es`
+  ya presente en NPM. La app lo resuelve listando los certificados de NPM y casando por
+  `*.negri.es` / `negri.es`. No emite cert nuevo. (DNS-01 es exclusivo de privados.)
+
+### 3. Reconciliación
+- Compara el **estado deseado** (nuestra DB) con el **estado real** (NPM + Cloudflare o
+  Mikrotik) y repara lo que falte o diverja.
+- Por dominio o para toda la flota. Reporta por dominio qué se creó/reparó.
+- Refresco periódico del estado desde la UI (polling a `/api/status`).
+
+## UI / Estilo
+
+- Estética **minimalista y moderna**, con acentos **tipo neón** (bordes/glow) para los
+  estados de sincronización.
+- Layout principal: **tabla densa** de dominios con badges de estado por proveedor y
+  acciones inline; formulario/modal de alta con selección de tipo (público/privado).
+- Tailwind 4 para todo el estilado. Definir tokens (colores neón por estado, radios,
+  sombras/glow) con `@theme` en el CSS global.
+- Diseñar el layout y **todos los estados** (loading, vacío, error, synced/drift/missing,
+  sin clasificar) **antes** de implementar, usando ux-engine.
+
+## Desarrollo
+
+Arrancar el servidor de desarrollo en segundo plano:
 
 ```
 astro dev --background
 ```
 
-Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
+Gestionar el servidor con `astro dev stop`, `astro dev status` y `astro dev logs`.
 
-## Documentation
+Variables de entorno (dev en `.env`, no commitear):
 
-Full documentation: https://docs.astro.build
+```
+DATABASE_URL=postgresql://user:pass@pgbouncer-host:6432/dbshared?options=-csearch_path%3Dproxy_control
+NPM_BASE_URL=http://npm.lan:81
+NPM_TOKEN=...                 # o NPM_EMAIL / NPM_PASSWORD según auth de NPM
+CLOUDFLARE_API_TOKEN=...
+CLOUDFLARE_ZONE_ID=...
+MIKROTIK_BASE_URL=https://192.168.88.1
+MIKROTIK_USER=...
+MIKROTIK_PASSWORD=...
+```
 
-Consult these guides before working on related tasks:
+## Docker / Infra
 
-- [Adding pages, dynamic routes, or middleware](https://docs.astro.build/en/guides/routing/)
-- [Working with Astro components](https://docs.astro.build/en/basics/astro-components/)
-- [Using React, Vue, Svelte, or other framework components](https://docs.astro.build/en/guides/framework-components/)
-- [Adding or managing content](https://docs.astro.build/en/guides/content-collections/)
-- [Adding styles or using Tailwind](https://docs.astro.build/en/guides/styling/)
-- [Supporting multiple languages](https://docs.astro.build/en/guides/internationalization/)
+Todo lo de despliegue vive en **`infra/`** en la raíz del repo, con **una subcarpeta por
+entorno** y el **`Dockerfile` multi-stage** compartido en `infra/`:
+
+```
+infra/
+  Dockerfile              # multi-stage (base → deps → build → prod-deps → runtime, + dev)
+  dev/      docker-compose.yml   .env.example
+  staging/  docker-compose.yml   .env.example   # PORT 4322
+  prod/     docker-compose.yml   .env.example   # PORT 4321
+  observability/          # Grafana, Alloy, Prometheus, Alertmanager (stack aparte)
+```
+
+```
+docker compose -f infra/dev/docker-compose.yml up --build          # o: npm run docker:dev
+docker compose -f infra/staging/docker-compose.yml up --build -d    # o: npm run docker:staging
+docker compose -f infra/prod/docker-compose.yml up --build -d        # o: npm run docker:prod
+```
+
+- **Etapas** del `Dockerfile`: `base` (Node 22 Alpine) → `deps` (deps completas) →
+  `build` (Astro) → `prod-deps` (`npm ci --omit=dev`) → `runtime` (imagen final:
+  `dist/` + node_modules de prod, arranca `node ./dist/server/entry.mjs`) y `dev`
+  (hot reload con el código montado por volumen).
+- El servidor SSR corre con `@astrojs/node` standalone, escuchando en `HOST`/`PORT`.
+- **No requiere `network_mode: host`**: la app solo hace peticiones HTTP/HTTPS salientes
+  a NPM, Cloudflare, Mikrotik y Postgres (red bridge normal). Basta con que el contenedor
+  alcance esos hosts en la LAN.
+- Persistencia en **Postgres compartido del core** (no volumen local). Los secretos
+  (tokens de CF/NPM/Mikrotik, `DATABASE_URL`) por variables de entorno / secrets del env.
+- La **observabilidad** (Grafana, Alloy, Prometheus, Alertmanager) se despliega desde
+  `infra/observability/`; la app solo expone `/metrics` y `/health` para que Alloy/Prometheus
+  la scrapeen.
+
+## Documentación
+
+Documentación completa: https://docs.astro.build
+
+Consultar estas guías antes de trabajar en tareas relacionadas:
+
+- [Añadir páginas, rutas dinámicas o middleware](https://docs.astro.build/en/guides/routing/)
+- [Trabajar con componentes Astro](https://docs.astro.build/en/basics/astro-components/)
+- [Usar componentes de framework (React, Preact, etc.)](https://docs.astro.build/en/guides/framework-components/)
+- [Renderizado bajo demanda / SSR y adaptadores](https://docs.astro.build/en/guides/on-demand-rendering/)
+- [Endpoints (API routes)](https://docs.astro.build/en/guides/endpoints/)
+- [Añadir estilos o usar Tailwind](https://docs.astro.build/en/guides/styling/)
+
+Referencias de integraciones:
+
+- Nginx Proxy Manager API: https://nginxproxymanager.com/api/
+- Cloudflare API (DNS records): https://developers.cloudflare.com/api/
+- RouterOS 7 REST API: https://help.mikrotik.com/docs/display/ROS/REST+API
