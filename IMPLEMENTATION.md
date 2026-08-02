@@ -284,20 +284,31 @@ en fallo (mapeado a HTTP 502).
 
 ---
 
-## 6. Endpoints API (SSR)
+## 6. Endpoints API (SSR) — ✅ HECHO
 
-Implementar en `src/pages/api/**` devolviendo JSON, usando `error-response.ts` para
-mapear `ValidationError → 400`, `NotFoundError → 404`, `ProviderError → 502`, resto → 500.
+En `src/pages/api/**`, JSON, con `http/error-response.ts` (`json`, `readJson`,
+`requireParam`, y `route()` que envuelve cada handler y mapea
+`ValidationError → 400` (+`fields`), `NotFoundError → 404`, `ProviderError → 502`
+(+`provider`), resto → 500). Validación de payloads con **zod** en `validation/`
+(`hostname.ts`, `ip.ts`, `domain.ts` → `parseCreateDomainInput`/`parseUpdateDomainInput`).
 
-- [ ] `GET /api/domains` → `listDomains()`
-- [ ] `POST /api/domains` → valida (`validation/*`) → `createDomain()`
-- [ ] `PATCH /api/domains/:id` / `DELETE /api/domains/:id`
-- [ ] `POST /api/domains/:id/reconcile` → `reconcileDomain(id)`
-- [ ] `GET /api/domains/:id/status` → `diff(domain)`
-- [ ] `POST /api/reconcile` → `reconcileAll()`
-- [ ] `GET /api/status` → estado resumido de la flota (para polling de la tabla)
-- [ ] `GET /health` (Fase 8) y `GET /metrics` (Fase 8)
+- [x] `GET /api/domains` → `listDomains()`
+- [x] `POST /api/domains` → `parseCreateDomainInput` → `createDomain()` (201)
+- [x] `PATCH /api/domains/:id` → `parseUpdateDomainInput` → `updateDomain()`
+- [x] `DELETE /api/domains/:id?removeDns=true` → `deleteDomain()`
+- [x] `POST /api/domains/:id/reconcile` → `reconcileDomain(id)`
+- [x] `GET /api/domains/:id/status` → `diff(domain)` (chequeo en vivo, on-demand)
+- [x] `POST /api/reconcile` → `reconcileAll()`
+- [x] `GET /api/status` → `listStatus()` (SOLO DB, barato para el polling)
+- [x] Servicios de soporte: `update-domain.ts`, `delete-domain.ts`, `list-status.ts`.
+- [x] `tsc` limpio y **`astro build` verde** (confirma que la validación de env corre en
+  runtime, no en build).
+- [ ] `GET /health` y `GET /metrics` → Fase 8.
 - CSRF: el front llama con `fetch` mismo-origen y `content-type: application/json`.
+
+> **Nota de diseño**: `/api/status` (polling) devuelve el estado **almacenado** en DB
+> (rápido); el chequeo en vivo contra proveedores es `/api/domains/:id/status` y la
+> reconciliación (botón). Coherente con "reconciliación bajo demanda".
 
 ---
 
