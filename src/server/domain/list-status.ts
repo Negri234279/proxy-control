@@ -1,4 +1,4 @@
-import type { ReconcileState, Visibility } from '../../lib/domain-types'
+import type { DomainStatusItem } from '../../lib/domain-types'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
 
@@ -6,15 +6,7 @@ import { domains } from '../db/schema'
 // La reconciliación (botón) es quien recalcula y persiste el estado real; el polling se
 // limita a reflejar lo almacenado.
 
-export interface DomainStatus {
-    id: string
-    hostname: string
-    visibility: Visibility
-    reconcileState: ReconcileState
-    lastReconciledAt: string | null
-}
-
-export async function listStatus(): Promise<DomainStatus[]> {
+export async function listStatus(): Promise<DomainStatusItem[]> {
     const rows = await db.select().from(domains)
     return rows.map((row) => ({
         id: row.id,

@@ -312,18 +312,26 @@ En `src/pages/api/**`, JSON, con `http/error-response.ts` (`json`, `readJson`,
 
 ---
 
-## 7. Front (UI) — **diseñar antes de implementar**
+## 7. Front (UI) — ✅ HECHO (falta ux-review)
 
-1. [ ] **ux-engine `ux-design`**: wireframe + spec de la tabla de dominios y del modal de
-   alta, cubriendo TODOS los estados: loading, vacío, error, `synced/drift/missing`,
-   `unclassified`, y el flujo de reconciliar (idle → reconciliando → resultado).
-2. [ ] `styles/global.css`: tokens `@theme` (colores neón por estado, radios, glow).
-3. [ ] Componentes atómicos en `src/components/` (tabla, fila, badges de proveedor,
-   botones de acción, modal de alta). Lógica de estado extraída a **hooks** en
-   `src/hooks/` (`useDomains`, `useReconcile`, `useCreateDomain`).
-4. [ ] `src/lib/domain-status.ts`: mapeo estado → label/color/icono (sin lógica).
-5. [ ] Polling de `/api/status` para refrescar badges (solo lectura).
-6. [ ] **ux-engine `ux-review`** sobre el diff antes de dar por cerrada la UI.
+1. [x] **ux-engine `ux-design`**: wireframe + spec (monitor-first, glow=estado, badges
+   NPM+DNS, flujo Classify, delete con `removeDns` OFF, freshness del polling).
+2. [x] `styles/global.css`: tokens `@theme` (neón por estado, radios, animaciones pulse/shimmer).
+3. [x] `src/lib/reconcile-state.ts`: metadata estado → glifo/label/color (sin lógica).
+   Tipos de vista compartidos centralizados en `src/lib/domain-types.ts`.
+4. [x] **Hooks** (`src/hooks/`): `useDomains`, `usePolling`, `useReconcile`, `useCreateDomain`,
+   `useDeleteDomain`, `useDomainFilters`, `useDomainStatus`, `useToasts`, `useNow`.
+5. [x] **Componentes atómicos** (`src/components/`): `DomainsApp` (isla raíz), `AppHeader`
+   (+PollingIndicator), `DomainsToolbar`, `DomainsTable` (skeleton/vacío/error), `DomainRow`
+   (+detalle en vivo expandible), `StatusBadge`, `VisibilityPill`, `Toggle`, `Spinner`,
+   `Modal`, `DomainFormModal` (add/classify/edit + errores por campo), `DeleteConfirmDialog`,
+   `ToastRegion`. `src/lib/api.ts` como cliente del front.
+6. [x] `index.astro` renderiza `<DomainsApp client:load />`; tema oscuro.
+7. [x] Polling de `/api/status` (solo lectura) parchea badges; pausa en pestaña oculta y
+   durante "reconciliar todo".
+8. [x] `tsc` limpio, `astro build` verde, `prettier` conforme.
+9. [ ] **ux-engine `ux-review`** del diff antes de cerrar (pendiente).
+10. [ ] Verificación visual real requiere DB + NPM (dev compose, Fase 9).
 
 ---
 

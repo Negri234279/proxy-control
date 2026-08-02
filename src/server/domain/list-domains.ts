@@ -1,22 +1,10 @@
-import type { ForwardScheme, ReconcileState, Visibility } from '../../lib/domain-types'
+import type { DomainListItem, ForwardScheme } from '../../lib/domain-types'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
 import { listProxyHosts } from '../providers/npm'
 
 // Vista de la tabla: cruza los dominios de NPM con la metadata de la DB. Los hosts de
 // NPM sin fila en la DB se devuelven como `unclassified`.
-
-export interface DomainListItem {
-    id: string | null // id de nuestra DB; null si está sin clasificar
-    hostname: string
-    visibility: Visibility
-    forwardScheme: ForwardScheme | null
-    forwardHost: string | null
-    forwardPort: number | null
-    reconcileState: ReconcileState | null
-    npmProxyId: number | null
-    enabledInNpm: boolean
-}
 
 export async function listDomains(): Promise<DomainListItem[]> {
     const [rows, hosts] = await Promise.all([db.select().from(domains), listProxyHosts()])

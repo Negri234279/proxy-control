@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import type { ReconcileState } from '../../lib/domain-types'
+import type { ReconcileResultItem } from '../../lib/domain-types'
 import { env } from '../config/env'
 import { db } from '../db/client'
 import { domains, type Domain, type NewDomain } from '../db/schema'
@@ -104,16 +104,9 @@ export async function reconcileDomain(id: string): Promise<Domain> {
     }
 }
 
-export interface ReconcileResult {
-    id: string
-    hostname: string
-    state: ReconcileState
-    error?: string
-}
-
-export async function reconcileAll(): Promise<ReconcileResult[]> {
+export async function reconcileAll(): Promise<ReconcileResultItem[]> {
     const rows = await db.select().from(domains)
-    const results: ReconcileResult[] = []
+    const results: ReconcileResultItem[] = []
 
     for (const row of rows) {
         if (row.visibility === 'unclassified') {

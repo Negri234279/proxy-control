@@ -34,3 +34,50 @@ export const DEFAULT_NPM_OPTIONS: NpmOptions = {
     hsts: true,
     forceSsl: true,
 }
+
+// ── Formas de vista compartidas front/back (respuestas de la API) ──
+
+// Fila de la tabla: NPM cruzado con la DB (id null = host de NPM sin clasificar).
+export interface DomainListItem {
+    id: string | null
+    hostname: string
+    visibility: Visibility
+    forwardScheme: ForwardScheme | null
+    forwardHost: string | null
+    forwardPort: number | null
+    reconcileState: ReconcileState | null
+    npmProxyId: number | null
+    enabledInNpm: boolean
+}
+
+// Snapshot de estado para el polling (solo DB).
+export interface DomainStatusItem {
+    id: string
+    hostname: string
+    visibility: Visibility
+    reconcileState: ReconcileState
+    lastReconciledAt: string | null
+}
+
+// Resultado por dominio de "reconciliar todo".
+export interface ReconcileResultItem {
+    id: string
+    hostname: string
+    state: ReconcileState
+    error?: string
+}
+
+// Chequeo por proveedor (diff en vivo).
+export interface ProviderCheckView {
+    present: boolean
+    drift: boolean
+    detail?: string
+}
+
+// Diff en vivo de un dominio (GET /api/domains/:id/status).
+export interface DomainDiffView {
+    state: ReconcileState
+    npm: ProviderCheckView
+    dns: ProviderCheckView
+    issues: string[]
+}

@@ -1,1 +1,70 @@
 @import 'tailwindcss';
+
+/* Tokens de tema (Tailwind 4). El glow neón se reserva para codificar estado de sync. */
+@theme {
+    --color-bg: #090c12;
+    --color-surface: #0f1521;
+    --color-surface-2: #151d2b;
+    --color-border: #1e2836;
+    --color-muted: #8593a6;
+    --color-text: #e6edf3;
+
+    --color-synced: #24e0a3;
+    --color-drift: #f5b544;
+    --color-missing: #ff5c6c;
+    --color-error: #ff2d55;
+    --color-checking: #38d0ff;
+    --color-neutral: #55627a;
+    --color-accent: #6c8cff;
+
+    --radius-card: 14px;
+}
+
+html,
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    color-scheme: dark;
+}
+
+body {
+    margin: 0;
+    font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        'Segoe UI',
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+}
+
+@keyframes pc-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.45;
+    }
+}
+
+.pc-pulse {
+    animation: pc-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pc-shimmer {
+    0% {
+        background-position: -400px 0;
+    }
+    100% {
+        background-position: 400px 0;
+    }
+}
+
+.pc-shimmer {
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), transparent);
+    background-size: 400px 100%;
+    animation: pc-shimmer 1.4s ease-in-out infinite;
+}

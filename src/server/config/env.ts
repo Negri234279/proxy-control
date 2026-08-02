@@ -7,6 +7,15 @@ import { z } from 'zod'
 // leen solo la URL de Postgres de process.env para no exigir el resto de secretos al
 // generar/aplicar migraciones.
 
+// En `astro dev` Vite carga el `.env` en `import.meta.env`, NO en `process.env`; en prod
+// (node standalone) el entorno ya viene inyectado en el proceso. Cargamos el `.env` en
+// `process.env` de forma best-effort para que ambos caminos funcionen con la misma lectura.
+try {
+    process.loadEnvFile()
+} catch {
+    // Sin `.env` (prod / CI): se usan las variables ya presentes en el entorno.
+}
+
 const boolFromEnv = (fallback: boolean) =>
     z
         .enum(['true', 'false'])
@@ -64,6 +73,8 @@ const schema = z
     })
 
 const parsed = schema.safeParse(process.env)
+
+console.log(process.env)
 
 if (!parsed.success) {
     const details = parsed.error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`).join('\n')
