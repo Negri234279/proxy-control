@@ -1,0 +1,8 @@
+.astro
+.claude
+.agents
+.vscode
+data
+dist
+node_modules
+*.md

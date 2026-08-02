@@ -1,17 +1,31 @@
 {
-  "name": "",
-  "type": "module",
-  "version": "0.0.1",
-  "engines": {
-    "node": ">=22.12.0"
-  },
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
-  },
-  "dependencies": {
-    "astro": "^7.1.6"
-  }
+    "name": "proxy-control",
+    "type": "module",
+    "version": "0.0.1",
+    "engines": {
+        "node": ">=24.13.0"
+    },
+    "scripts": {
+        "dev": "astro dev",
+        "build": "astro build",
+        "preview": "astro preview",
+        "start": "node ./dist/server/entry.mjs",
+        "astro": "astro",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "dependencies": {
+        "@astrojs/node": "11.0.3",
+        "@astrojs/preact": "6.0.2",
+        "@tailwindcss/vite": "4.3.3",
+        "astro": "^7.1.6",
+        "preact": "10.29.8",
+        "tailwindcss": "4.3.3"
+    },
+    "devDependencies": {
+        "@types/node": "24.13.3",
+        "prettier": "3.9.6",
+        "prettier-plugin-astro": "0.14.1",
+        "prettier-plugin-tailwindcss": "0.8.1"
+    }
 }
