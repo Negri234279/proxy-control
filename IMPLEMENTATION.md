@@ -139,10 +139,14 @@ infra/                          # Fase 9
 
 ---
 
-## 3. Capa de datos (Postgres + Drizzle)
+## 3. Capa de datos (Postgres + Drizzle) — ✅ HECHO
 
-- [ ] `src/server/config/env.ts`: leer y validar env (fallar rápido si falta algo).
-- [ ] `src/server/db/schema.ts`: tabla `domains` en esquema `proxy_control`:
+- [x] `src/server/config/env.ts`: valida env con **zod** (fallo rápido con detalle).
+  `AUTH_USER`/`AUTH_PASSWORD_HASH` requeridos solo si `AUTH_ENABLED`. Las herramientas
+  de DB NO usan este módulo (leen solo la URL de Postgres de `process.env`).
+- [x] Tipos compartidos front/back en `src/lib/domain-types.ts` (`NpmOptions`,
+  `CustomLocation`, uniones, `DEFAULT_NPM_OPTIONS`).
+- [x] `src/server/db/schema.ts`: tabla `domains` en esquema `proxy_control`:
   `id (uuid, pk, default gen_random_uuid())`, `hostname (text, unique)`,
   `visibility (enum: public|private|unclassified)`,
   `forward_scheme (enum: http|https, default 'http')`, `forward_host (text)`,
@@ -158,14 +162,18 @@ infra/                          # Fase 9
   `last_reconciled_at (timestamptz null)`, `created_at`, `updated_at`.
 - Defaults de `npm_options`: todo `true` (block_exploits, websockets, cache_assets,
   http2, hsts, force_ssl). `ssl_mode`: `new` si public, `wildcard` si private.
-- [ ] `drizzle.config.ts` apuntando a `schema.ts`, `out: './drizzle'`, `schema: 'proxy_control'`.
-- [ ] `src/server/db/client.ts`: `pg.Pool` + `drizzle()`. **Importante pgbouncer
-  transaction mode**: usar `pg` con statements no-prepared o pasar
-  `?options=-c%20search_path%3Dproxy_control`; evitar prepared statements persistentes.
-- [ ] Migración inicial: `CREATE SCHEMA IF NOT EXISTS proxy_control;` + tabla.
-  Generar con `npm run db:generate` y aplicar con `npm run db:migrate`.
-- [ ] **Hecho** cuando: `db:migrate` crea el esquema y la tabla, y un script de humo
-  hace `SELECT 1` y un insert/round-trip.
+- [x] `drizzle.config.ts` → `schema.ts`, `out: './drizzle'`, `schemaFilter: ['proxy_control']`.
+  Carga `.env` con `process.loadEnvFile()`; usa `MIGRATION_DATABASE_URL ?? DATABASE_URL`.
+- [x] `src/server/db/client.ts`: `pg.Pool` + `drizzle()`. **pgbouncer transaction mode**:
+  node-postgres no usa prepared statements con nombre → compatible; además Drizzle
+  cualifica por esquema (`proxy_control.*`), así que no dependemos del `search_path`.
+- [x] `src/server/db/migrate.ts`: runner con `drizzle-orm/node-postgres/migrator`; en prod
+  usa la conexión DIRECTA (`MIGRATION_DATABASE_URL`), no el pooler.
+- [x] Migración inicial generada (`drizzle/0000_*.sql`): `CREATE SCHEMA "proxy_control"`
+  + 5 enums + tabla `domains` (20 columnas, `UNIQUE(hostname)`, defaults). Verificado.
+- [x] TypeScript añadido (devDep) + script `typecheck`; `tsc --noEmit` limpio, `build` verde.
+- [ ] **Pendiente de DB real**: aplicar con `npm run db:migrate` y smoke `SELECT 1` /
+  insert round-trip cuando haya un Postgres accesible (dev compose, Fase 9).
 
 ---
 

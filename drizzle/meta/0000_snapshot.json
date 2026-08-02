@@ -1,0 +1,201 @@
+{
+    "id": "7260b32d-c547-4164-80ee-4b72e20d4d69",
+    "prevId": "00000000-0000-0000-0000-000000000000",
+    "version": "7",
+    "dialect": "postgresql",
+    "tables": {
+        "proxy_control.domains": {
+            "name": "domains",
+            "schema": "proxy_control",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "uuid",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "default": "gen_random_uuid()"
+                },
+                "hostname": {
+                    "name": "hostname",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "visibility": {
+                    "name": "visibility",
+                    "type": "visibility",
+                    "typeSchema": "proxy_control",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "'unclassified'"
+                },
+                "forward_scheme": {
+                    "name": "forward_scheme",
+                    "type": "forward_scheme",
+                    "typeSchema": "proxy_control",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "'http'"
+                },
+                "forward_host": {
+                    "name": "forward_host",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "forward_port": {
+                    "name": "forward_port",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "npm_options": {
+                    "name": "npm_options",
+                    "type": "jsonb",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "'{\"blockExploits\":true,\"websockets\":true,\"cacheAssets\":true,\"http2\":true,\"hsts\":true,\"forceSsl\":true}'::jsonb"
+                },
+                "custom_locations": {
+                    "name": "custom_locations",
+                    "type": "jsonb",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "'[]'::jsonb"
+                },
+                "ssl_mode": {
+                    "name": "ssl_mode",
+                    "type": "ssl_mode",
+                    "typeSchema": "proxy_control",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "certificate_id": {
+                    "name": "certificate_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "cf_record_type": {
+                    "name": "cf_record_type",
+                    "type": "cf_record_type",
+                    "typeSchema": "proxy_control",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "'A'"
+                },
+                "cf_content": {
+                    "name": "cf_content",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "cf_proxied": {
+                    "name": "cf_proxied",
+                    "type": "boolean",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": true
+                },
+                "npm_proxy_id": {
+                    "name": "npm_proxy_id",
+                    "type": "integer",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "cloudflare_record_id": {
+                    "name": "cloudflare_record_id",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "mikrotik_dns_id": {
+                    "name": "mikrotik_dns_id",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "reconcile_state": {
+                    "name": "reconcile_state",
+                    "type": "reconcile_state",
+                    "typeSchema": "proxy_control",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "'missing'"
+                },
+                "last_reconciled_at": {
+                    "name": "last_reconciled_at",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "created_at": {
+                    "name": "created_at",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "now()"
+                },
+                "updated_at": {
+                    "name": "updated_at",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "now()"
+                }
+            },
+            "indexes": {},
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {
+                "domains_hostname_unique": {
+                    "name": "domains_hostname_unique",
+                    "nullsNotDistinct": false,
+                    "columns": ["hostname"]
+                }
+            },
+            "policies": {},
+            "checkConstraints": {},
+            "isRLSEnabled": false
+        }
+    },
+    "enums": {
+        "proxy_control.cf_record_type": {
+            "name": "cf_record_type",
+            "schema": "proxy_control",
+            "values": ["A", "CNAME"]
+        },
+        "proxy_control.forward_scheme": {
+            "name": "forward_scheme",
+            "schema": "proxy_control",
+            "values": ["http", "https"]
+        },
+        "proxy_control.reconcile_state": {
+            "name": "reconcile_state",
+            "schema": "proxy_control",
+            "values": ["synced", "drift", "missing", "error"]
+        },
+        "proxy_control.ssl_mode": {
+            "name": "ssl_mode",
+            "schema": "proxy_control",
+            "values": ["new", "wildcard"]
+        },
+        "proxy_control.visibility": {
+            "name": "visibility",
+            "schema": "proxy_control",
+            "values": ["public", "private", "unclassified"]
+        }
+    },
+    "schemas": {
+        "proxy_control": "proxy_control"
+    },
+    "sequences": {},
+    "roles": {},
+    "policies": {},
+    "views": {},
+    "_meta": {
+        "columns": {},
+        "schemas": {},
+        "tables": {}
+    }
+}
