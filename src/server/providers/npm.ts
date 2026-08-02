@@ -95,8 +95,8 @@ export function listCertificates(): Promise<NpmCertificate[]> {
     return authedJson<NpmCertificate[]>('/api/nginx/certificates')
 }
 
-export function createProxyHost(input: CreateProxyHostInput): Promise<NpmProxyHost> {
-    const body = {
+function buildProxyHostBody(input: CreateProxyHostInput) {
+    return {
         domain_names: [input.hostname],
         forward_scheme: input.forwardScheme,
         forward_host: input.forwardHost,
@@ -124,10 +124,19 @@ export function createProxyHost(input: CreateProxyHostInput): Promise<NpmProxyHo
             dns_challenge: input.certificateId === 'new' ? input.dnsChallenge : false,
         },
     }
+}
 
+export function createProxyHost(input: CreateProxyHostInput): Promise<NpmProxyHost> {
     return authedJson<NpmProxyHost>('/api/nginx/proxy-hosts', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(buildProxyHostBody(input)),
+    })
+}
+
+export function updateProxyHost(id: number, input: CreateProxyHostInput): Promise<NpmProxyHost> {
+    return authedJson<NpmProxyHost>(`/api/nginx/proxy-hosts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(buildProxyHostBody(input)),
     })
 }
 

@@ -250,46 +250,37 @@ en fallo (mapeado a HTTP 502).
 
 ---
 
-## 5. Lógica de dominio y reconciliación
+## 5. Lógica de dominio y reconciliación — ✅ HECHO
 
-### 5.1 Alta de dominio — `domain/create-domain.ts`
-Orquesta según `visibility`, con orden estricto y rollback en fallo:
+> **Decisión de diseño (cambio vs plan original)**: en vez de "external-first con
+> rollback", se implementa **estado-deseado-primero**: `createDomain` inserta la fila
+> deseada y delega en `reconcileDomain`, que crea los recursos en orden **DNS → NPM**.
+> Ventajas: reutiliza la reconciliación para el alta, respeta "CF/Mikrotik **antes** que
+> NPM", y ante fallo la fila queda en `error` (reintentable con el botón) sin rollback
+> frágil. Helpers compartidos en `domain/desired.ts` evitan duplicar el mapeo.
 
-- **public**:
-  1. `cloudflare.createRecord()` — tipo `cf_record_type` (default **A** → IP pública),
-     `proxied = cf_proxied` (default **true**), TTL 1.
-  2. `npm.createProxyHost({ ...defaults, certificate_id: 'new', meta.dns_challenge: false })`
-     — **flujo estándar de NPM de "solicitar cert nuevo" con Let's Encrypt**.
-  3. `db.insert()`.
-  > SSL público: comportamiento por defecto de NPM (`dns_challenge: false`). El registro
-  > CF puede quedar *proxied* (naranja); NPM gestiona la validación como lo hace de forma
-  > normal. DNS-01 NO se usa en público (queda reservado al wildcard privado).
-- **private**:
-  1. `mikrotik.createStaticDns({ name: hostname, address: NPM_INTERNAL_IP })`.
-  2. Resolver el cert wildcard (**DNS-01**): `npm.listCertificates()` → casar
-     `*.negri.es`/`negri.es` → `createProxyHost({ ...defaults, certificate_id: <idWildcard> })`
-     (**no** emite nuevo).
-  3. `db.insert()`.
-- [ ] Defaults de `npm_options` aplicados en ambos: `block_exploits`, `websockets`,
-  `cache_assets`, `http2`, `hsts`, `force_ssl` = `true`; `locations = []`.
-- [ ] Si falla un paso posterior, revertir el/los anteriores (borrar record/proxy) o,
-  si no es posible, persistir `reconcile_state: 'error'` para reparar luego.
+### 5.1 Alta de dominio — `domain/create-domain.ts` — [x]
+- [x] Inserta la fila deseada (`npm_options` = `DEFAULT_NPM_OPTIONS`, `ssl_mode` `new`/
+  `wildcard`, `cf_*` para público) con `reconcile_state: 'missing'`, luego `reconcileDomain`.
+- [x] Validación mínima: público con registro **A** exige `cfContent`/`PUBLIC_IP`.
+- [x] Colisión de `hostname` (unique 23505) → `ValidationError`.
+- [x] Si la reconciliación falla, la fila queda en `error` y se devuelve igualmente.
 
-### 5.2 Reconciliación — `reconcile/diff.ts` + `domain/reconcile-domain.ts`
-- [ ] `diff(domain)`: consulta NPM + (CF o Mikrotik según tipo) y calcula estado:
-  `synced` (todo existe y coincide), `drift` (existe pero difiere),
-  `missing` (falta en algún proveedor), `error` (fallo al consultar).
-  El `drift` incluye divergencias en: `forward_*`, opciones de `npm_options`
-  (block_exploits, websockets, cache_assets, http2, hsts, force_ssl), certificado SSL
-  (público con cert / privado con wildcard), y en el registro CF (`record_type`,
-  `content`, `proxied`) o la entrada DNS del Mikrotik (`address`).
-- [ ] `reconcileDomain(id)`: recalcula diff y **crea/repara lo que falte**; actualiza
-  `reconcile_state` y `last_reconciled_at`.
-- [ ] `reconcileAll()`: itera la flota (secuencial o con límite de concurrencia).
+### 5.2 Reconciliación — `reconcile/diff.ts` + `domain/reconcile-domain.ts` — [x]
+- [x] `diff(domain)`: lee NPM + (CF o Mikrotik) y deriva `synced`/`drift`/`missing`/`error`.
+  El `drift` cubre `forward_*`, las 6 opciones de `npm_options`, ausencia de cert SSL, y
+  el registro CF (`type`/`content`/`proxied`) o la entrada Mikrotik (`address`).
+- [x] `reconcileDomain(id)`: asegura DNS (CF/Mikrotik) **y luego** NPM; crea lo que falta y
+  repara el drift (`updateRecord`/`updateStaticDns`/`updateProxyHost`); persiste ids +
+  `reconcile_state` + `last_reconciled_at`. Deja `error` si algo falla. Rechaza `unclassified`.
+- [x] `reconcileAll()`: itera la flota (secuencial), salta `unclassified`, devuelve resumen.
+- [x] CRUD de providers completado con `updateProxyHost`/`updateRecord`/`updateStaticDns`.
 
-### 5.3 Listado — `domain/list-domains.ts`
-- [ ] Cruza `npm.listProxyHosts()` con `db.select()` por `hostname`. Los hosts de NPM
-  sin fila en DB se devuelven como `visibility: 'unclassified'`.
+### 5.3 Listado — `domain/list-domains.ts` — [x]
+- [x] Cruza `listProxyHosts()` con la DB por `hostname`; hosts de NPM sin fila →
+  `visibility: 'unclassified'`. Incluye `enabledInNpm` y `npmProxyId`.
+
+- [x] `tsc --noEmit` limpio y `prettier` conforme en toda la Fase 5.
 
 ---
 

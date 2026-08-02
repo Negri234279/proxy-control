@@ -73,7 +73,7 @@ function mikrotikRequest<T>(method: string, path: string, body?: unknown): Promi
         if (payload !== undefined) {
             req.write(payload)
         }
-        
+
         req.end()
     })
 }
@@ -88,6 +88,10 @@ export function createStaticDns(input: CreateStaticDnsInput): Promise<MikrotikDn
         address: input.address,
         type: 'A',
     })
+}
+
+export function updateStaticDns(id: string, address: string): Promise<MikrotikDnsEntry> {
+    return mikrotikRequest<MikrotikDnsEntry>('PATCH', `/ip/dns/static/${encodeURIComponent(id)}`, { address })
 }
 
 export function deleteStaticDns(id: string): Promise<void> {

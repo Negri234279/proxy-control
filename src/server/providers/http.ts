@@ -11,7 +11,7 @@ export async function fetchJson<T>(url: string, options: FetchJsonOptions): Prom
     const { provider, ...init } = options
 
     let response: Response
-    
+
     try {
         response = await fetch(url, init)
     } catch (cause) {

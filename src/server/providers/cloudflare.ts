@@ -67,6 +67,19 @@ export function createRecord(input: CreateRecordInput): Promise<CfDnsRecord> {
     })
 }
 
+export function updateRecord(id: string, input: CreateRecordInput): Promise<CfDnsRecord> {
+    return cfJson<CfDnsRecord>(`/zones/${ZONE}/dns_records/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+            type: input.type,
+            name: input.name,
+            content: input.content,
+            proxied: input.proxied,
+            ttl: 1,
+        }),
+    })
+}
+
 export function deleteRecord(id: string): Promise<{ id: string }> {
     return cfJson<{ id: string }>(`/zones/${ZONE}/dns_records/${id}`, { method: 'DELETE' })
 }
