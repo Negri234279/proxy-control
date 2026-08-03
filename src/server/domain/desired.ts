@@ -34,8 +34,9 @@ export function desiredProxyHostInput(domain: Domain, certificateId: number | 'n
         forwardScheme: domain.forwardScheme,
         forwardHost: domain.forwardHost,
         forwardPort: domain.forwardPort,
-        npmOptions: domain.npmOptions ?? DEFAULT_NPM_OPTIONS,
+        npmOptions: { ...DEFAULT_NPM_OPTIONS, ...(domain.npmOptions ?? {}) },
         customLocations: domain.customLocations ?? [],
+        advancedConfig: domain.advancedConfig ?? '',
         certificateId,
         // Público: flujo estándar de NPM (sin DNS challenge). Privado: irrelevante (cert ya existe).
         dnsChallenge: false,

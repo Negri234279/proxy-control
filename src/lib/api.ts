@@ -44,6 +44,7 @@ export interface CreateDomainBody {
     forwardPort: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
+    advancedConfig?: string
     certificateId?: number | 'new'
     cfRecordType?: CfRecordType
     cfContent?: string
@@ -55,6 +56,9 @@ export interface UpdateDomainBody {
     forwardHost?: string
     forwardPort?: number
     npmOptions?: NpmOptions
+    customLocations?: CustomLocation[]
+    advancedConfig?: string
+    certificateId?: number | null
     cfRecordType?: CfRecordType
     cfContent?: string | null
     cfProxied?: boolean

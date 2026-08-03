@@ -1,0 +1,2 @@
+ALTER TABLE "proxy_control"."domains" ALTER COLUMN "npm_options" SET DEFAULT '{"blockExploits":true,"websockets":false,"cacheAssets":false,"http2":true,"hsts":true,"hstsSubdomains":true,"forceSsl":true,"trustForwardedProto":false}'::jsonb;--> statement-breakpoint
+ALTER TABLE "proxy_control"."domains" ADD COLUMN "advanced_config" text DEFAULT '' NOT NULL;

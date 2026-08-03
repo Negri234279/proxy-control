@@ -14,9 +14,10 @@ const npmOptionsSchema = z.object({
     cacheAssets: z.boolean(),
     http2: z.boolean(),
     hsts: z.boolean(),
-    // Lenient con clientes antiguos que no envíen el flag nuevo.
+    // Lenient con clientes antiguos que no envíen los flags nuevos.
     hstsSubdomains: z.boolean().default(false),
     forceSsl: z.boolean(),
+    trustForwardedProto: z.boolean().default(false),
 })
 
 const customLocationSchema = z.object({
@@ -24,6 +25,7 @@ const customLocationSchema = z.object({
     forwardScheme: z.enum(['http', 'https']),
     forwardHost: z.string().min(1),
     forwardPort: z.number().int().min(1).max(65535),
+    advancedConfig: z.string().default(''),
 })
 
 const forwardHostSchema = z.string().min(1)
@@ -38,6 +40,7 @@ const createSchema = z
         forwardPort: forwardPortSchema,
         npmOptions: npmOptionsSchema.optional(),
         customLocations: z.array(customLocationSchema).optional(),
+        advancedConfig: z.string().optional(),
         certificateId: z.union([z.literal('new'), z.number().int().positive()]).optional(),
         cfRecordType: z.enum(['A', 'CNAME']).optional(),
         cfContent: z.string().min(1).optional(),
@@ -62,6 +65,8 @@ const updateSchema = z
         forwardPort: forwardPortSchema.optional(),
         npmOptions: npmOptionsSchema.optional(),
         customLocations: z.array(customLocationSchema).optional(),
+        advancedConfig: z.string().optional(),
+        certificateId: z.number().int().positive().nullable().optional(),
         cfRecordType: z.enum(['A', 'CNAME']).optional(),
         cfContent: z.string().min(1).nullable().optional(),
         cfProxied: z.boolean().optional(),

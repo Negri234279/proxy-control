@@ -20,6 +20,7 @@ export interface CreateDomainInput {
     forwardPort: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
+    advancedConfig?: string
     // Certificado SSL: 'new' (solicitar uno nuevo de Let's Encrypt) o el id de un cert
     // existente en NPM (p. ej. el wildcard *.negri.es). undefined = default por tipo.
     certificateId?: number | 'new'
@@ -52,6 +53,7 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         forwardPort: input.forwardPort,
         npmOptions: input.npmOptions ?? DEFAULT_NPM_OPTIONS,
         customLocations: input.customLocations ?? [],
+        advancedConfig: input.advancedConfig ?? '',
         // Cert elegido: número = existente; 'new'/undefined = solicitar nuevo (público).
         certificateId: usesExistingCert ? (input.certificateId as number) : null,
         sslMode,

@@ -31,6 +31,13 @@ export async function listDomains(): Promise<DomainListItem[]> {
             dnsState: live?.dns ?? null,
             npmProxyId: host?.id ?? row.npmProxyId,
             enabledInNpm: host ? host.enabled === true || host.enabled === 1 : false,
+            npmOptions: row.npmOptions,
+            customLocations: row.customLocations,
+            advancedConfig: row.advancedConfig,
+            certificateId: row.certificateId,
+            cfRecordType: row.cfRecordType,
+            cfContent: row.cfContent,
+            cfProxied: row.cfProxied,
         })
 
         seen.add(row.hostname)
@@ -54,6 +61,13 @@ export async function listDomains(): Promise<DomainListItem[]> {
                 dnsState: null,
                 npmProxyId: host.id,
                 enabledInNpm: host.enabled === true || host.enabled === 1,
+                npmOptions: null,
+                customLocations: [],
+                advancedConfig: '',
+                certificateId: null,
+                cfRecordType: null,
+                cfContent: null,
+                cfProxied: true,
             })
         }
     }

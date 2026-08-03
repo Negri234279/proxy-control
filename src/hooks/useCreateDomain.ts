@@ -3,6 +3,7 @@ import { api, type ApiError, type CreateDomainBody, type UpdateDomainBody } from
 import {
     DEFAULT_NPM_OPTIONS,
     type CfRecordType,
+    type CustomLocation,
     type DomainListItem,
     type ForwardScheme,
     type NpmOptions,
@@ -18,6 +19,8 @@ export interface DomainForm {
     forwardHost: string
     forwardPort: string
     npmOptions: NpmOptions
+    customLocations: CustomLocation[]
+    advancedConfig: string
     // 'new' = solicitar cert nuevo (LE); o el id (string) de un cert existente en NPM.
     certificateId: string
     cfRecordType: CfRecordType
@@ -32,10 +35,20 @@ const emptyForm = (): DomainForm => ({
     forwardHost: '',
     forwardPort: '',
     npmOptions: { ...DEFAULT_NPM_OPTIONS },
+    customLocations: [],
+    advancedConfig: '',
     certificateId: 'new',
     cfRecordType: 'A',
     cfContent: '',
     cfProxied: true,
+})
+
+const emptyLocation = (): CustomLocation => ({
+    path: '/',
+    forwardScheme: 'http',
+    forwardHost: '',
+    forwardPort: 80,
+    advancedConfig: '',
 })
 
 interface CreateDeps {
@@ -43,8 +56,8 @@ interface CreateDeps {
     pushToast: (kind: ToastKind, message: string) => void
 }
 
-// Estado del modal de alta/clasificar/editar: formulario, errores por campo (mapeados
-// del 400 `fields`) y envío.
+// Estado del modal de alta/clasificar/editar: formulario completo (mismos campos que NPM),
+// errores por campo (del 400 `fields`) y envío. Editar prefilla todo desde la fila.
 export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
     const [isOpen, setIsOpen] = useState(false)
     const [mode, setMode] = useState<FormMode>('add')
@@ -83,6 +96,13 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             forwardScheme: row.forwardScheme ?? 'http',
             forwardHost: row.forwardHost ?? '',
             forwardPort: row.forwardPort ? String(row.forwardPort) : '',
+            npmOptions: { ...DEFAULT_NPM_OPTIONS, ...(row.npmOptions ?? {}) },
+            customLocations: row.customLocations ?? [],
+            advancedConfig: row.advancedConfig ?? '',
+            certificateId: row.certificateId ? String(row.certificateId) : 'new',
+            cfRecordType: row.cfRecordType ?? 'A',
+            cfContent: row.cfContent ?? '',
+            cfProxied: row.cfProxied,
         })
         setFieldErrors({})
         setMode('edit')
@@ -102,6 +122,26 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
         setForm((prev) => ({ ...prev, npmOptions: { ...prev.npmOptions, [key]: value } }))
     }, [])
 
+    const addLocation = useCallback(() => {
+        setForm((prev) => ({ ...prev, customLocations: [...prev.customLocations, emptyLocation()] }))
+    }, [])
+
+    const removeLocation = useCallback((index: number) => {
+        setForm((prev) => ({ ...prev, customLocations: prev.customLocations.filter((_, i) => i !== index) }))
+    }, [])
+
+    const updateLocation = useCallback(
+        <K extends keyof CustomLocation>(index: number, key: K, value: CustomLocation[K]) => {
+            setForm((prev) => ({
+                ...prev,
+                customLocations: prev.customLocations.map((location, i) =>
+                    i === index ? { ...location, [key]: value } : location,
+                ),
+            }))
+        },
+        [],
+    )
+
     const submit = useCallback(async () => {
         setSubmitting(true)
         setFieldErrors({})
@@ -112,9 +152,13 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     forwardScheme: form.forwardScheme,
                     forwardHost: form.forwardHost,
                     forwardPort: Number(form.forwardPort),
+                    npmOptions: form.npmOptions,
+                    customLocations: form.customLocations,
+                    advancedConfig: form.advancedConfig,
                 }
 
                 if (form.visibility === 'public') {
+                    body.certificateId = form.certificateId === 'new' ? null : Number(form.certificateId)
                     body.cfRecordType = form.cfRecordType
                     body.cfContent = form.cfContent || null
                     body.cfProxied = form.cfProxied
@@ -131,6 +175,8 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     forwardHost: form.forwardHost,
                     forwardPort: Number(form.forwardPort),
                     npmOptions: form.npmOptions,
+                    customLocations: form.customLocations,
+                    advancedConfig: form.advancedConfig,
                 }
 
                 if (form.visibility === 'public') {
@@ -139,7 +185,6 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                         body.cfContent = form.cfContent
                     }
                     body.cfProxied = form.cfProxied
-                    // Certificado: 'new' (nuevo LE) o el id de uno existente en NPM.
                     body.certificateId = form.certificateId === 'new' ? 'new' : Number(form.certificateId)
                 }
 
@@ -176,6 +221,9 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
         close,
         setField,
         setOption,
+        addLocation,
+        removeLocation,
+        updateLocation,
         submit,
     }
 }

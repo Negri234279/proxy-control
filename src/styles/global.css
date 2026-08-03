@@ -40,6 +40,17 @@ body {
         sans-serif;
 }
 
+/* Selects en tema oscuro: el desplegable nativo hereda texto claro sobre fondo blanco.
+   Fijamos color-scheme + colores explícitos en las opciones para que se lea. */
+select {
+    color-scheme: dark;
+}
+
+option {
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
+}
+
 @keyframes pc-pulse {
     0%,
     100% {

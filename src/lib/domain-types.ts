@@ -16,6 +16,7 @@ export interface NpmOptions {
     hsts: boolean // hsts_enabled
     hstsSubdomains: boolean // hsts_subdomains (incluir subdominios en HSTS)
     forceSsl: boolean // ssl_forced
+    trustForwardedProto: boolean // trust_forwarded_proto (confiar en X-Forwarded-Proto)
 }
 
 // Ubicación personalizada dentro de un proxy host (NPM `locations[]`).
@@ -24,6 +25,7 @@ export interface CustomLocation {
     forwardScheme: ForwardScheme
     forwardHost: string
     forwardPort: number
+    advancedConfig: string // config nginx personalizada por ubicación
 }
 
 // Defaults aplicados al crear cualquier dominio (todas las protecciones ON).
@@ -35,6 +37,7 @@ export const DEFAULT_NPM_OPTIONS: NpmOptions = {
     hsts: true,
     hstsSubdomains: true,
     forceSsl: true,
+    trustForwardedProto: false,
 }
 
 // ── Formas de vista compartidas front/back (respuestas de la API) ──
@@ -54,6 +57,14 @@ export interface DomainListItem {
     dnsState: ReconcileState | null
     npmProxyId: number | null
     enabledInNpm: boolean
+    // Config deseada (para editar). Null en dominios sin clasificar.
+    npmOptions: NpmOptions | null
+    customLocations: CustomLocation[]
+    advancedConfig: string
+    certificateId: number | null
+    cfRecordType: CfRecordType | null
+    cfContent: string | null
+    cfProxied: boolean
 }
 
 // Snapshot de estado para el polling (chequeo en vivo).

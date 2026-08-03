@@ -12,6 +12,9 @@ export interface UpdateDomainInput {
     forwardPort?: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
+    advancedConfig?: string
+    // number = cert existente; null = solicitar uno nuevo en la próxima reconciliación.
+    certificateId?: number | null
     cfRecordType?: CfRecordType
     cfContent?: string | null
     cfProxied?: boolean

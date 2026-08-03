@@ -24,6 +24,7 @@ const NPM_OPTION_LABELS: { key: keyof NpmOptions; label: string }[] = [
     { key: 'hsts', label: 'HSTS' },
     { key: 'hstsSubdomains', label: 'HSTS Subdomains' },
     { key: 'forceSsl', label: 'Force SSL' },
+    { key: 'trustForwardedProto', label: 'Trust forwarded proto header' },
 ]
 
 function FieldError({ message }: { message?: string }) {
@@ -47,7 +48,7 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
     const { form, fieldErrors, mode } = create
     const meta = TITLES[mode]
     const isPublic = form.visibility === 'public'
-    const showCertPicker = isPublic && mode !== 'edit'
+    const showCertPicker = isPublic
 
     return (
         <Modal
@@ -150,21 +151,139 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                     <FieldError message={fieldErrors.forwardHost ?? fieldErrors.forwardPort} />
                 </div>
 
-                {mode !== 'edit' ? (
-                    <fieldset class="rounded-md border p-3" style={inputStyle}>
-                        <legend class="px-1 text-sm font-medium">Opciones NPM</legend>
-                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {NPM_OPTION_LABELS.map((option) => (
-                                <Toggle
-                                    key={option.key}
-                                    label={option.label}
-                                    checked={form.npmOptions[option.key]}
-                                    onChange={(value) => create.setOption(option.key, value)}
+                <fieldset class="rounded-md border p-3" style={inputStyle}>
+                    <legend class="px-1 text-sm font-medium">Opciones NPM</legend>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {NPM_OPTION_LABELS.map((option) => (
+                            <Toggle
+                                key={option.key}
+                                label={option.label}
+                                checked={form.npmOptions[option.key]}
+                                onChange={(value) => create.setOption(option.key, value)}
+                            />
+                        ))}
+                    </div>
+                </fieldset>
+
+                <fieldset class="rounded-md border p-3" style={inputStyle}>
+                    <legend class="px-1 text-sm font-medium">Ubicaciones personalizadas</legend>
+                    <div class="flex flex-col gap-3">
+                        {form.customLocations.length === 0 ? (
+                            <p class="text-xs text-[var(--color-muted)]">Ninguna. Todo va al upstream principal.</p>
+                        ) : null}
+                        {form.customLocations.map((location, index) => (
+                            <div
+                                key={index}
+                                class="flex flex-col gap-2 rounded-md border p-2"
+                                style={{ borderColor: 'var(--color-border)' }}
+                            >
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        class={inputClass}
+                                        style={inputStyle}
+                                        value={location.path}
+                                        onInput={(event) =>
+                                            create.updateLocation(
+                                                index,
+                                                'path',
+                                                (event.target as HTMLInputElement).value,
+                                            )
+                                        }
+                                        placeholder="/api"
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label="Eliminar ubicación"
+                                        onClick={() => create.removeLocation(index)}
+                                        class="rounded-md px-2 py-1 text-sm hover:bg-[var(--color-surface-2)]"
+                                    >
+                                        🗑
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <select
+                                        class="rounded-md border bg-transparent px-2 py-1.5 text-sm"
+                                        style={inputStyle}
+                                        value={location.forwardScheme}
+                                        onChange={(event) =>
+                                            create.updateLocation(
+                                                index,
+                                                'forwardScheme',
+                                                (event.target as HTMLSelectElement).value as ForwardScheme,
+                                            )
+                                        }
+                                    >
+                                        <option value="http">http</option>
+                                        <option value="https">https</option>
+                                    </select>
+                                    <span class="text-[var(--color-muted)]">://</span>
+                                    <input
+                                        class={inputClass}
+                                        style={inputStyle}
+                                        value={location.forwardHost}
+                                        onInput={(event) =>
+                                            create.updateLocation(
+                                                index,
+                                                'forwardHost',
+                                                (event.target as HTMLInputElement).value,
+                                            )
+                                        }
+                                        placeholder="10.0.0.6"
+                                    />
+                                    <span class="text-[var(--color-muted)]">:</span>
+                                    <input
+                                        class="w-24 rounded-md border bg-transparent px-3 py-1.5 text-sm"
+                                        style={inputStyle}
+                                        type="number"
+                                        value={location.forwardPort}
+                                        onInput={(event) =>
+                                            create.updateLocation(
+                                                index,
+                                                'forwardPort',
+                                                Number((event.target as HTMLInputElement).value),
+                                            )
+                                        }
+                                        placeholder="8080"
+                                    />
+                                </div>
+                                <textarea
+                                    class="min-h-16 w-full rounded-md border bg-transparent px-3 py-1.5 font-mono text-xs"
+                                    style={inputStyle}
+                                    value={location.advancedConfig}
+                                    onInput={(event) =>
+                                        create.updateLocation(
+                                            index,
+                                            'advancedConfig',
+                                            (event.target as HTMLTextAreaElement).value,
+                                        )
+                                    }
+                                    placeholder="Config nginx avanzada de esta ubicación (opcional)"
                                 />
-                            ))}
-                        </div>
-                    </fieldset>
-                ) : null}
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={create.addLocation}
+                            class="self-start rounded-md border px-2.5 py-1 text-xs hover:bg-[var(--color-surface-2)]"
+                            style={{ borderColor: 'var(--color-border)' }}
+                        >
+                            + Añadir ubicación
+                        </button>
+                    </div>
+                </fieldset>
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium">Config Nginx avanzada</label>
+                    <textarea
+                        class="min-h-20 w-full rounded-md border bg-transparent px-3 py-1.5 font-mono text-xs"
+                        style={inputStyle}
+                        value={form.advancedConfig}
+                        onInput={(event) =>
+                            create.setField('advancedConfig', (event.target as HTMLTextAreaElement).value)
+                        }
+                        placeholder="Directivas nginx personalizadas del proxy host (opcional)"
+                    />
+                </div>
 
                 {isPublic ? (
                     <fieldset class="rounded-md border p-3" style={inputStyle}>

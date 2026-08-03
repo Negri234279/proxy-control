@@ -7,6 +7,14 @@ import { fetchJson } from './http'
 
 const BASE = env.NPM_BASE_URL.replace(/\/$/, '')
 
+export interface NpmProxyHostLocation {
+    path: string
+    forward_scheme: string
+    forward_host: string
+    forward_port: number
+    advanced_config: string
+}
+
 // NPM devuelve los flags como boolean (v2.15) o 0/1 según versión: tipamos ambos.
 export interface NpmProxyHost {
     id: number
@@ -23,6 +31,9 @@ export interface NpmProxyHost {
     hsts_enabled: number | boolean
     hsts_subdomains: number | boolean
     ssl_forced: number | boolean
+    trust_forwarded_proto: number | boolean
+    advanced_config: string
+    locations: NpmProxyHostLocation[]
 }
 
 export interface NpmCertificate {
@@ -39,6 +50,7 @@ export interface CreateProxyHostInput {
     forwardPort: number
     npmOptions: NpmOptions
     customLocations: CustomLocation[]
+    advancedConfig: string
     // 'new' → NPM emite un cert nuevo de Let's Encrypt; número → cert existente (wildcard).
     certificateId: number | 'new'
     // Solo relevante con 'new': false = flujo estándar de NPM (sin DNS challenge).
@@ -112,14 +124,15 @@ function buildProxyHostBody(input: CreateProxyHostInput) {
         block_exploits: input.npmOptions.blockExploits,
         caching_enabled: input.npmOptions.cacheAssets,
         allow_websocket_upgrade: input.npmOptions.websockets,
-        advanced_config: '',
+        trust_forwarded_proto: input.npmOptions.trustForwardedProto ?? false,
+        advanced_config: input.advancedConfig,
         enabled: true,
         locations: input.customLocations.map((location) => ({
             path: location.path,
             forward_scheme: location.forwardScheme,
             forward_host: location.forwardHost,
             forward_port: location.forwardPort,
-            advanced_config: '',
+            advanced_config: location.advancedConfig ?? '',
         })),
         meta: {
             letsencrypt_agree: input.certificateId === 'new',

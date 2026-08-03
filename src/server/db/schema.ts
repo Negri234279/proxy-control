@@ -22,9 +22,10 @@ export const domains = proxyControl.table('domains', {
     forwardHost: text('forward_host'),
     forwardPort: integer('forward_port'),
 
-    // Opciones del proxy host de NPM (JSONB) + ubicaciones personalizadas.
+    // Opciones del proxy host de NPM (JSONB) + ubicaciones personalizadas + config avanzada.
     npmOptions: jsonb('npm_options').$type<NpmOptions>().notNull().default(DEFAULT_NPM_OPTIONS),
     customLocations: jsonb('custom_locations').$type<CustomLocation[]>().notNull().default([]),
+    advancedConfig: text('advanced_config').notNull().default(''),
 
     // Política SSL: public → 'new' (LE nuevo); private → 'wildcard' (*.negri.es, DNS-01).
     sslMode: sslModeEnum('ssl_mode'),
