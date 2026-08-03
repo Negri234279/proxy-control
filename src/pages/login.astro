@@ -1,0 +1,68 @@
+---
+import '../styles/global.css'
+
+const hasError = Astro.url.searchParams.has('error')
+---
+
+<html lang="es">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>proxy-control · acceso</title>
+    </head>
+    <body>
+        <main class="flex min-h-screen items-center justify-center px-4">
+            <form
+                method="post"
+                action="/api/auth/login"
+                class="flex w-full max-w-sm flex-col gap-4 rounded-[var(--radius-card)] border p-6"
+                style="border-color: var(--color-border); background-color: var(--color-surface);"
+            >
+                <div>
+                    <h1 class="text-lg font-semibold">proxy-control</h1>
+                    <p class="text-sm" style="color: var(--color-muted);">Inicia sesión para continuar</p>
+                </div>
+
+                {
+                    hasError && (
+                        <p class="text-sm" style="color: var(--color-error);">
+                            ⚠ Credenciales incorrectas
+                        </p>
+                    )
+                }
+
+                <label class="flex flex-col gap-1 text-sm">
+                    Usuario
+                    <input
+                        name="user"
+                        autocomplete="username"
+                        required
+                        class="rounded-md border bg-transparent px-3 py-1.5 text-sm"
+                        style="border-color: var(--color-border);"
+                    />
+                </label>
+
+                <label class="flex flex-col gap-1 text-sm">
+                    Contraseña
+                    <input
+                        name="password"
+                        type="password"
+                        autocomplete="current-password"
+                        required
+                        class="rounded-md border bg-transparent px-3 py-1.5 text-sm"
+                        style="border-color: var(--color-border);"
+                    />
+                </label>
+
+                <button
+                    type="submit"
+                    class="rounded-md px-3 py-1.5 text-sm font-medium text-white"
+                    style="background-color: var(--color-accent);"
+                >
+                    Entrar
+                </button>
+            </form>
+        </main>
+    </body>
+</html>

@@ -15,7 +15,7 @@ import { DomainsToolbar } from './DomainsToolbar'
 import { ToastRegion } from './ToastRegion'
 
 // Isla raíz: compone los hooks (toda la lógica de estado) y los componentes.
-export function DomainsApp() {
+export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
     const { toasts, push, dismiss } = useToasts()
     const { status, domains, refetch, applyStatusSnapshot, patchRow } = useDomains()
     const [pollingEnabled, setPollingEnabled] = useState(true)
@@ -32,6 +32,7 @@ export function DomainsApp() {
                 lastUpdatedAt={polling.lastUpdatedAt}
                 pollingFailed={polling.failed}
                 fleetRunning={reconcile.fleetRunning}
+                authEnabled={authEnabled}
                 onReconcileAll={reconcile.reconcileAll}
                 onAdd={create.openAdd}
             />

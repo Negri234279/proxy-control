@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css'
 import { DomainsApp } from '../components/DomainsApp'
+import { env } from '../server/config/env'
 ---
 
 <html lang="es">
@@ -12,6 +13,6 @@ import { DomainsApp } from '../components/DomainsApp'
         <title>proxy-control</title>
     </head>
     <body>
-        <DomainsApp client:load />
+        <DomainsApp client:load authEnabled={env.AUTH_ENABLED} />
     </body>
 </html>

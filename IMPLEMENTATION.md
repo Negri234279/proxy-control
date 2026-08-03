@@ -335,16 +335,20 @@ En `src/pages/api/**`, JSON, con `http/error-response.ts` (`json`, `readJson`,
 
 ---
 
-## 8. Observabilidad, health y auth
+## 8. Observabilidad, health y auth — ✅ HECHO
 
-- [ ] `observability/metrics.ts`: registro `prom-client` con métricas de negocio
-  (dominios por estado, reconciliaciones, errores por proveedor, latencia de llamadas).
-  Exponer en `GET /metrics`.
-- [ ] `observability/logger.ts`: logs JSON estructurados a stdout (nivel, msg, contexto).
-- [ ] `GET /health`: readiness de DB (`SELECT 1`) y ping ligero a proveedores (con cache).
-- [ ] `middleware.ts` + `auth/`: si `AUTH_ENABLED`, exigir cookie de sesión válida;
-  `login.astro` + `POST /api/auth/login` (verifica `AUTH_USER`/`AUTH_PASSWORD_HASH`),
-  `POST /api/auth/logout`. Excluir `/health` y `/metrics` del guard.
+- [x] `observability/metrics.ts`: registro `prom-client` (default metrics + gauge
+  `proxy_control_domains{state}` refrescado desde DB + counter `proxy_control_reconcile_total{result}`
+  incrementado en `reconcileDomain`). Expuesto en `GET /metrics`.
+- [x] `observability/logger.ts`: logs JSON estructurados a stdout/stderr.
+- [x] `GET /health`: readiness de DB (`SELECT 1`) → 200 / 503.
+- [x] `auth/`: `session.ts` (cookie firmada HMAC-SHA256, sin estado en servidor),
+  `password.ts` (Argon2 vía `@node-rs/argon2`). `middleware.ts` guard con `AUTH_ENABLED`
+  (excluye `/login`, `/api/auth/login`, `/health`, `/metrics`, assets; API → 401, páginas
+  → redirect a `/login`). `login.astro` (form) + `POST /api/auth/login` + `POST /api/auth/logout`.
+  Botón "Salir" en el header cuando `authEnabled`.
+- [x] Script `npm run auth:hash -- '<password>'` para generar `AUTH_PASSWORD_HASH` (probado).
+- [x] `tsc` limpio, `astro build` verde, `prettier` conforme.
 
 ---
 

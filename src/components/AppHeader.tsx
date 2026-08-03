@@ -5,6 +5,7 @@ interface Props {
     lastUpdatedAt: number | null
     pollingFailed: boolean
     fleetRunning: boolean
+    authEnabled: boolean
     onReconcileAll: () => void
     onAdd: () => void
 }
@@ -14,6 +15,7 @@ function relativeAge(from: number, now: number): string {
     if (seconds < 60) {
         return `hace ${seconds}s`
     }
+    
     return `hace ${Math.round(seconds / 60)} min`
 }
 
@@ -66,6 +68,17 @@ export function AppHeader(props: Props) {
                 >
                     + Añadir dominio
                 </button>
+                {props.authEnabled ? (
+                    <form method="post" action="/api/auth/logout">
+                        <button
+                            type="submit"
+                            class="rounded-md border px-3 py-1.5 text-sm hover:bg-[var(--color-surface-2)]"
+                            style={{ borderColor: 'var(--color-border)' }}
+                        >
+                            Salir
+                        </button>
+                    </form>
+                ) : null}
             </div>
         </header>
     )

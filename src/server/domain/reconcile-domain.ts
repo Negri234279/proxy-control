@@ -6,6 +6,7 @@ import { domains, type Domain, type NewDomain } from '../db/schema'
 import { ValidationError } from '../errors'
 import { createRecord, findRecord, updateRecord } from '../providers/cloudflare'
 import { createStaticDns, listStaticDns, updateStaticDns } from '../providers/mikrotik'
+import { reconcileCounter } from '../observability/metrics'
 import { createProxyHost, listProxyHosts, updateProxyHost } from '../providers/npm'
 import { desiredCertificateId, desiredCfRecord, desiredProxyHostInput } from './desired'
 import { getDomainOrThrow } from './get-domain'
@@ -21,6 +22,7 @@ async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Pro
     if (!existing) {
         const created = await createRecord(desired)
         updates.cloudflareRecordId = created.id
+
         return
     }
 
@@ -29,6 +31,7 @@ async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Pro
     if (drift) {
         await updateRecord(existing.id, desired)
     }
+
     updates.cloudflareRecordId = existing.id
 }
 
@@ -45,6 +48,7 @@ async function ensurePrivateDns(domain: Domain, updates: Partial<NewDomain>): Pr
     if (existing.address !== env.NPM_INTERNAL_IP) {
         await updateStaticDns(existing['.id'], env.NPM_INTERNAL_IP)
     }
+
     updates.mikrotikDnsId = existing['.id']
 }
 
@@ -65,6 +69,7 @@ async function ensureNpm(domain: Domain, updates: Partial<NewDomain>): Promise<v
     }
 
     await updateProxyHost(existing.id, input)
+
     updates.npmProxyId = existing.id
 }
 
@@ -94,12 +99,18 @@ export async function reconcileDomain(id: string): Promise<Domain> {
             .set({ ...updates, reconcileState: 'synced', lastReconciledAt: new Date() })
             .where(eq(domains.id, id))
             .returning()
+
+        reconcileCounter.inc({ result: 'synced' })
+
         return saved
     } catch (error) {
         await db
             .update(domains)
             .set({ ...updates, reconcileState: 'error', lastReconciledAt: new Date() })
             .where(eq(domains.id, id))
+
+        reconcileCounter.inc({ result: 'error' })
+
         throw error
     }
 }
@@ -109,9 +120,8 @@ export async function reconcileAll(): Promise<ReconcileResultItem[]> {
     const results: ReconcileResultItem[] = []
 
     for (const row of rows) {
-        if (row.visibility === 'unclassified') {
-            continue
-        }
+        if (row.visibility === 'unclassified') continue
+
         try {
             const saved = await reconcileDomain(row.id)
             results.push({ id: saved.id, hostname: saved.hostname, state: saved.reconcileState })
