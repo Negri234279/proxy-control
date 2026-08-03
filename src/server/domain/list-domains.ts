@@ -2,12 +2,15 @@ import type { DomainListItem, ForwardScheme } from '../../lib/domain-types'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
 import { listProxyHosts } from '../providers/npm'
+import { computeFleetState } from '../reconcile/diff'
 
-// Vista de la tabla: cruza los dominios de NPM con la metadata de la DB. Los hosts de
-// NPM sin fila en la DB se devuelven como `unclassified`.
+// Vista de la tabla: cruza los dominios de NPM con la metadata de la DB, comprobando EN
+// VIVO el estado real de cada dominio clasificado (NPM + Cloudflare/Mikrotik). Los hosts
+// de NPM sin fila en la DB se devuelven como `unclassified`.
 
 export async function listDomains(): Promise<DomainListItem[]> {
     const [rows, hosts] = await Promise.all([db.select().from(domains), listProxyHosts()])
+    const liveState = await computeFleetState(rows, hosts)
 
     const seen = new Set<string>()
     const items: DomainListItem[] = []
@@ -21,9 +24,9 @@ export async function listDomains(): Promise<DomainListItem[]> {
             forwardScheme: row.forwardScheme,
             forwardHost: row.forwardHost,
             forwardPort: row.forwardPort,
-            reconcileState: row.reconcileState,
+            reconcileState: liveState.get(row.id) ?? row.reconcileState,
             npmProxyId: host?.id ?? row.npmProxyId,
-            enabledInNpm: host ? host.enabled === 1 : false,
+            enabledInNpm: host ? host.enabled === true || host.enabled === 1 : false,
         })
         seen.add(row.hostname)
     }

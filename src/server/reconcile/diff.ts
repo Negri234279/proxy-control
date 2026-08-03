@@ -1,8 +1,8 @@
 import type { ReconcileState } from '../../lib/domain-types'
 import { env } from '../config/env'
 import type { Domain } from '../db/schema'
-import { findRecord } from '../providers/cloudflare'
-import { listStaticDns } from '../providers/mikrotik'
+import { findRecord, listRecords, type CfDnsRecord } from '../providers/cloudflare'
+import { listStaticDns, type MikrotikDnsEntry } from '../providers/mikrotik'
 import { listProxyHosts, type NpmProxyHost } from '../providers/npm'
 
 // Compara el estado deseado (fila `Domain`) con el real (NPM + Cloudflare/Mikrotik) y
@@ -21,7 +21,12 @@ export interface DomainDiff {
     issues: string[]
 }
 
-const intBool = (value: number): boolean => value === 1
+// NPM devuelve estos flags como boolean (v2.15) o como 0/1 según versión: toleramos ambos.
+const intBool = (value: number | boolean): boolean => value === true || value === 1
+
+const ERROR_CHECK: ProviderCheck = { present: false, drift: false, detail: 'error al consultar el proveedor' }
+
+// ── Chequeos puros (sin I/O): comparan la fila con lo observado ──
 
 function npmDrift(domain: Domain, host: NpmProxyHost): string[] {
     const issues: string[] = []
@@ -58,9 +63,7 @@ function npmDrift(domain: Domain, host: NpmProxyHost): string[] {
     return issues
 }
 
-async function checkNpm(domain: Domain): Promise<ProviderCheck> {
-    const hosts = await listProxyHosts()
-    const host = hosts.find((candidate) => candidate.domain_names.includes(domain.hostname))
+export function npmCheck(domain: Domain, host: NpmProxyHost | undefined): ProviderCheck {
     if (!host) {
         return { present: false, drift: false, detail: 'no existe el proxy host en NPM' }
     }
@@ -68,28 +71,25 @@ async function checkNpm(domain: Domain): Promise<ProviderCheck> {
     return { present: true, drift: issues.length > 0, detail: issues.join(', ') || undefined }
 }
 
-async function checkDns(domain: Domain): Promise<ProviderCheck> {
-    if (domain.visibility === 'public') {
-        const record = await findRecord(domain.hostname)
-        if (!record) {
-            return { present: false, drift: false, detail: 'no existe el registro en Cloudflare' }
-        }
-        const expectedContent = domain.cfContent ?? env.PUBLIC_IP
-        const issues: string[] = []
-        if (record.type !== domain.cfRecordType) {
-            issues.push('tipo difiere')
-        }
-        if (expectedContent && record.content !== expectedContent) {
-            issues.push('content difiere')
-        }
-        if (record.proxied !== domain.cfProxied) {
-            issues.push('proxied difiere')
-        }
-        return { present: true, drift: issues.length > 0, detail: issues.join(', ') || undefined }
+export function cloudflareCheck(domain: Domain, record: CfDnsRecord | undefined): ProviderCheck {
+    if (!record) {
+        return { present: false, drift: false, detail: 'no existe el registro en Cloudflare' }
     }
+    const expectedContent = domain.cfContent ?? env.PUBLIC_IP
+    const issues: string[] = []
+    if (record.type !== domain.cfRecordType) {
+        issues.push('tipo difiere')
+    }
+    if (expectedContent && record.content !== expectedContent) {
+        issues.push('content difiere')
+    }
+    if (record.proxied !== domain.cfProxied) {
+        issues.push('proxied difiere')
+    }
+    return { present: true, drift: issues.length > 0, detail: issues.join(', ') || undefined }
+}
 
-    const entries = await listStaticDns()
-    const entry = entries.find((candidate) => candidate.name === domain.hostname)
+export function mikrotikCheck(domain: Domain, entry: MikrotikDnsEntry | undefined): ProviderCheck {
     if (!entry) {
         return { present: false, drift: false, detail: 'no existe la entrada DNS en el Mikrotik' }
     }
@@ -97,15 +97,33 @@ async function checkDns(domain: Domain): Promise<ProviderCheck> {
     return { present: true, drift, detail: drift ? 'address difiere' : undefined }
 }
 
+export function resolveState(input: { errored: boolean; npm: ProviderCheck; dns: ProviderCheck }): ReconcileState {
+    if (input.errored) {
+        return 'error'
+    }
+    if (!input.npm.present || !input.dns.present) {
+        return 'missing'
+    }
+    if (input.npm.drift || input.dns.drift) {
+        return 'drift'
+    }
+    return 'synced'
+}
+
+// ── Diff EN VIVO de un dominio (GET /api/domains/:id/status) ──
+
 export async function diff(domain: Domain): Promise<DomainDiff> {
     const issues: string[] = []
-
     let npm: ProviderCheck
     let dns: ProviderCheck
     let errored = false
 
     try {
-        npm = await checkNpm(domain)
+        const hosts = await listProxyHosts()
+        npm = npmCheck(
+            domain,
+            hosts.find((host) => host.domain_names.includes(domain.hostname)),
+        )
     } catch (error) {
         errored = true
         npm = { present: false, drift: false, detail: (error as Error).message }
@@ -113,7 +131,16 @@ export async function diff(domain: Domain): Promise<DomainDiff> {
     }
 
     try {
-        dns = await checkDns(domain)
+        if (domain.visibility === 'public') {
+            const record = await findRecord(domain.hostname)
+            dns = cloudflareCheck(domain, record ?? undefined)
+        } else {
+            const entries = await listStaticDns()
+            dns = mikrotikCheck(
+                domain,
+                entries.find((entry) => entry.name === domain.hostname),
+            )
+        }
     } catch (error) {
         errored = true
         dns = { present: false, drift: false, detail: (error as Error).message }
@@ -127,19 +154,64 @@ export async function diff(domain: Domain): Promise<DomainDiff> {
         issues.push(`DNS: ${dns.detail}`)
     }
 
-    const state = resolveState({ errored, npm, dns })
-    return { state, npm, dns, issues }
+    return { state: resolveState({ errored, npm, dns }), npm, dns, issues }
 }
 
-function resolveState(input: { errored: boolean; npm: ProviderCheck; dns: ProviderCheck }): ReconcileState {
-    if (input.errored) {
-        return 'error'
+// ── Estado EN VIVO de la flota (batcheado): una llamada por proveedor ──
+// Comprueba cada dominio clasificado contra NPM (hosts ya obtenidos por el llamador) +
+// la lista de Cloudflare (públicos) o del Mikrotik (privados). Un fallo de un proveedor
+// solo marca 'error' a los dominios que dependen de él, no rompe el resto.
+
+export async function computeFleetState(
+    domains: Domain[],
+    hosts: NpmProxyHost[],
+): Promise<Map<string, ReconcileState>> {
+    const classified = domains.filter((domain) => domain.visibility !== 'unclassified')
+    const needPrivate = classified.some((domain) => domain.visibility === 'private')
+    const needPublic = classified.some((domain) => domain.visibility === 'public')
+
+    let mikrotikError = false
+    let entries: MikrotikDnsEntry[] = []
+    if (needPrivate) {
+        try {
+            entries = await listStaticDns()
+        } catch {
+            mikrotikError = true
+        }
     }
-    if (!input.npm.present || !input.dns.present) {
-        return 'missing'
+
+    let cloudflareError = false
+    let records: CfDnsRecord[] = []
+    if (needPublic) {
+        try {
+            records = await listRecords()
+        } catch {
+            cloudflareError = true
+        }
     }
-    if (input.npm.drift || input.dns.drift) {
-        return 'drift'
+
+    const cfByName = new Map(records.map((record) => [record.name, record]))
+    const entryByName = new Map(entries.map((entry) => [entry.name, entry]))
+
+    const stateById = new Map<string, ReconcileState>()
+    for (const domain of classified) {
+        const npm = npmCheck(
+            domain,
+            hosts.find((host) => host.domain_names.includes(domain.hostname)),
+        )
+
+        let dns: ProviderCheck
+        let dnsErrored: boolean
+        if (domain.visibility === 'public') {
+            dnsErrored = cloudflareError
+            dns = cloudflareError ? ERROR_CHECK : cloudflareCheck(domain, cfByName.get(domain.hostname))
+        } else {
+            dnsErrored = mikrotikError
+            dns = mikrotikError ? ERROR_CHECK : mikrotikCheck(domain, entryByName.get(domain.hostname))
+        }
+
+        stateById.set(domain.id, resolveState({ errored: dnsErrored, npm, dns }))
     }
-    return 'synced'
+
+    return stateById
 }

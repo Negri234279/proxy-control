@@ -306,9 +306,11 @@ En `src/pages/api/**`, JSON, con `http/error-response.ts` (`json`, `readJson`,
 - [ ] `GET /health` y `GET /metrics` → Fase 8.
 - CSRF: el front llama con `fetch` mismo-origen y `content-type: application/json`.
 
-> **Nota de diseño**: `/api/status` (polling) devuelve el estado **almacenado** en DB
-> (rápido); el chequeo en vivo contra proveedores es `/api/domains/:id/status` y la
-> reconciliación (botón). Coherente con "reconciliación bajo demanda".
+> **Nota de diseño (actualizada)**: `/api/domains` y `/api/status` comprueban **en vivo**
+> el estado real (NPM + Cloudflare/Mikrotik, batcheado con `computeFleetState`), para
+> detectar cambios hechos fuera de la app (p. ej. borrar una entrada DNS a mano). La
+> reconciliación (botón) sigue siendo la única que **repara**. Providers con timeout
+> (fetch 10s / Mikrotik 8s) para no colgar la carga si un proveedor no responde.
 
 ---
 

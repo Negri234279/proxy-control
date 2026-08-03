@@ -13,7 +13,8 @@ export async function fetchJson<T>(url: string, options: FetchJsonOptions): Prom
     let response: Response
 
     try {
-        response = await fetch(url, init)
+        // Timeout de red para no colgar la carga de la tabla si un proveedor no responde.
+        response = await fetch(url, { signal: AbortSignal.timeout(10_000), ...init })
     } catch (cause) {
         throw new ProviderError(provider, `No se pudo contactar con ${provider}`, { cause })
     }

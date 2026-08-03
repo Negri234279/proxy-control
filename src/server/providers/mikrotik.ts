@@ -36,7 +36,7 @@ function mikrotikRequest<T>(method: string, path: string, body?: unknown): Promi
             headers['Content-Length'] = String(Buffer.byteLength(payload))
         }
 
-        const req = request(new URL(BASE + path), { method, agent, headers }, (res) => {
+        const req = request(new URL(BASE + path), { method, agent, headers, timeout: 8000 }, (res) => {
             const chunks: Buffer[] = []
 
             res.on('data', (chunk) => chunks.push(chunk as Buffer))
@@ -65,6 +65,9 @@ function mikrotikRequest<T>(method: string, path: string, body?: unknown): Promi
                 }
             })
         })
+
+        // Sin timeout, un Mikrotik inalcanzable colgaría la carga de la tabla.
+        req.on('timeout', () => req.destroy(new Error('timeout tras 8s')))
 
         req.on('error', (cause) =>
             reject(new ProviderError('mikrotik', 'No se pudo contactar con Mikrotik', { cause })),

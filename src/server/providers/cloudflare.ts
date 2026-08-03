@@ -54,6 +54,11 @@ export async function findRecord(name: string): Promise<CfDnsRecord | null> {
     return records[0] ?? null
 }
 
+// Lista todos los registros de la zona (para comprobar en vivo la flota de una vez).
+export function listRecords(): Promise<CfDnsRecord[]> {
+    return cfJson<CfDnsRecord[]>(`/zones/${ZONE}/dns_records?per_page=1000`)
+}
+
 export function createRecord(input: CreateRecordInput): Promise<CfDnsRecord> {
     return cfJson<CfDnsRecord>(`/zones/${ZONE}/dns_records`, {
         method: 'POST',

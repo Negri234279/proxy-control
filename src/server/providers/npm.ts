@@ -7,20 +7,21 @@ import { fetchJson } from './http'
 
 const BASE = env.NPM_BASE_URL.replace(/\/$/, '')
 
+// NPM devuelve los flags como boolean (v2.15) o 0/1 según versión: tipamos ambos.
 export interface NpmProxyHost {
     id: number
     domain_names: string[]
     forward_scheme: string
     forward_host: string
     forward_port: number
-    enabled: number
+    enabled: number | boolean
     certificate_id: number
-    block_exploits: number
-    allow_websocket_upgrade: number
-    caching_enabled: number
-    http2_support: number
-    hsts_enabled: number
-    ssl_forced: number
+    block_exploits: number | boolean
+    allow_websocket_upgrade: number | boolean
+    caching_enabled: number | boolean
+    http2_support: number | boolean
+    hsts_enabled: number | boolean
+    ssl_forced: number | boolean
 }
 
 export interface NpmCertificate {
