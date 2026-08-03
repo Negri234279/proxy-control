@@ -29,11 +29,11 @@ export interface CustomLocation {
 // Defaults aplicados al crear cualquier dominio (todas las protecciones ON).
 export const DEFAULT_NPM_OPTIONS: NpmOptions = {
     blockExploits: true,
-    websockets: true,
-    cacheAssets: true,
+    websockets: false,
+    cacheAssets: false,
     http2: true,
     hsts: true,
-    hstsSubdomains: false,
+    hstsSubdomains: true,
     forceSsl: true,
 }
 

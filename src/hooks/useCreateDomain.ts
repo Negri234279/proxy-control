@@ -102,6 +102,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
     const submit = useCallback(async () => {
         setSubmitting(true)
         setFieldErrors({})
+
         try {
             if (mode === 'edit' && editingId) {
                 const body: UpdateDomainBody = {
@@ -109,12 +110,15 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     forwardHost: form.forwardHost,
                     forwardPort: Number(form.forwardPort),
                 }
+
                 if (form.visibility === 'public') {
                     body.cfRecordType = form.cfRecordType
                     body.cfContent = form.cfContent || null
                     body.cfProxied = form.cfProxied
                 }
+
                 await api.updateDomain(editingId, body)
+
                 pushToast('success', `${form.hostname} actualizado`)
             } else {
                 const body: CreateDomainBody = {
@@ -125,6 +129,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     forwardPort: Number(form.forwardPort),
                     npmOptions: form.npmOptions,
                 }
+
                 if (form.visibility === 'public') {
                     body.cfRecordType = form.cfRecordType
                     if (form.cfContent) {
@@ -132,13 +137,18 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     }
                     body.cfProxied = form.cfProxied
                 }
+
                 await api.createDomain(body)
+
                 pushToast('success', `${form.hostname} creado`)
             }
+
             setIsOpen(false)
+
             await refetch()
         } catch (error) {
             const apiError = error as ApiError
+            
             if (apiError.status === 400 && apiError.fields) {
                 setFieldErrors(apiError.fields)
             } else {
