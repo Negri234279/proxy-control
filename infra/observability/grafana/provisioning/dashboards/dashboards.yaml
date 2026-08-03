@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+    - name: proxy-control
+      type: file
+      folder: proxy-control
+      disableDeletion: false
+      allowUiUpdates: true
+      options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: false

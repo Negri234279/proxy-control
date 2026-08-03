@@ -10,7 +10,7 @@ function emit(level: Level, message: string, context?: Context): void {
         message,
         ...context,
     })
-    
+
     if (level === 'error') {
         console.error(line)
     } else {

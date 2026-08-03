@@ -7,7 +7,7 @@ import { json } from '../server/http/error-response'
 export const GET: APIRoute = async () => {
     try {
         await db.execute(sql`select 1`)
-        
+
         return json({ status: 'ok', db: 'up' })
     } catch {
         return json({ status: 'degraded', db: 'down' }, 503)

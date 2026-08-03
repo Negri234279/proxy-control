@@ -1,0 +1,192 @@
+# ─────────────────────────────────────────────────────────────
+# DEV — TODO EN LOCAL, sin dependencias externas. App con hot-reload + su propio
+# Postgres (SIN pgbouncer, no hace falta en dev) + observabilidad COMPLETA
+# (Prometheus · Loki · Alloy · Alertmanager · Grafana).
+#
+#   docker compose -f infra/dev/compose.yml --env-file infra/dev/.env up --build
+#
+# Los nombres de servicio se unifican a `proxy-control-*` para que las configs de
+# ../observability sean idénticas a las de prod. Los secretos de NPM/Cloudflare/
+# Mikrotik/auth se leen del `.env` de la raíz (env_file), y DATABASE_URL se
+# sobreescribe aquí para apuntar al Postgres del stack.
+# ─────────────────────────────────────────────────────────────
+name: proxy-control-dev
+
+services:
+    proxy-control-postgres:
+        image: postgres:16-alpine
+        container_name: proxy-control-postgres
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-proxy_control}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-proxy_control}
+            POSTGRES_DB: ${POSTGRES_DB:-proxy_control}
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-proxy_control} -d ${POSTGRES_DB:-proxy_control}']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        ports:
+            - '${POSTGRES_PORT:-15432}:5432'
+        volumes:
+            - pgdata_dev:/var/lib/postgresql/data
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control-postgres-exporter:
+        image: quay.io/prometheuscommunity/postgres-exporter:latest
+        container_name: proxy-control-postgres-exporter
+        environment:
+            DATA_SOURCE_NAME: 'postgresql://${POSTGRES_USER:-proxy_control}:${POSTGRES_PASSWORD:-proxy_control}@proxy-control-postgres:5432/${POSTGRES_DB:-proxy_control}?sslmode=disable'
+        depends_on:
+            proxy-control-postgres:
+                condition: service_healthy
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control:
+        image: proxy-control:dev
+        container_name: proxy-control
+        build:
+            context: ../..
+            dockerfile: infra/Dockerfile
+            target: dev
+        # Migra (tsx, disponible en el target dev) y arranca el dev server.
+        command: ['sh', '-c', 'npm run db:migrate && npm run dev -- --host 0.0.0.0']
+        env_file:
+            # Reutiliza el `.env` de la raíz para NPM/Cloudflare/Mikrotik/auth.
+            - path: ../../.env
+              required: false
+        environment:
+            NODE_ENV: development
+            HOST: 0.0.0.0
+            PORT: 4321
+            # Sobreescribe la DATABASE_URL del .env para apuntar al Postgres del stack.
+            DATABASE_URL: postgresql://${POSTGRES_USER:-proxy_control}:${POSTGRES_PASSWORD:-proxy_control}@proxy-control-postgres:5432/${POSTGRES_DB:-proxy_control}
+        depends_on:
+            proxy-control-postgres:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD-SHELL', 'wget -q --spider http://localhost:4321/health || exit 1']
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 40s
+        ports:
+            - '${APP_PORT:-4321}:4321'
+        # Montajes por subruta (hot reload) sin tapar el node_modules de la imagen.
+        volumes:
+            - ../../src:/app/src
+            - ../../public:/app/public
+            - ../../drizzle:/app/drizzle
+            - ../../astro.config.mjs:/app/astro.config.mjs
+            - ../../tsconfig.json:/app/tsconfig.json
+            - ../../drizzle.config.ts:/app/drizzle.config.ts
+            - ../../package.json:/app/package.json
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control-prometheus:
+        image: prom/prometheus:latest
+        container_name: proxy-control-prometheus
+        command:
+            - --config.file=/etc/prometheus/prometheus.yml
+        volumes:
+            - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - ../observability/prometheus/rules:/etc/prometheus/rules:ro
+            - ./scrape.d:/etc/prometheus/scrape.d:ro
+            - prometheus_dev:/prometheus
+        ports:
+            - '${PROMETHEUS_PORT:-19090}:9090'
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control-loki:
+        image: grafana/loki:latest
+        container_name: proxy-control-loki
+        command: ['-config.file=/etc/loki/loki-config.yaml']
+        volumes:
+            - ../observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+            - loki_dev:/loki
+        ports:
+            - '${LOKI_PORT:-13100}:3100'
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control-alloy:
+        image: grafana/alloy:latest
+        container_name: proxy-control-alloy
+        command:
+            - run
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --storage.path=/var/lib/alloy/data
+            - /etc/alloy/config.alloy
+        volumes:
+            - ../observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - alloy_dev:/var/lib/alloy/data
+        ports:
+            - '${ALLOY_PORT:-12345}:12345'
+        depends_on:
+            - proxy-control-loki
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control-alertmanager-init:
+        image: busybox:1.37
+        container_name: proxy-control-alertmanager-init
+        command:
+            - sh
+            - -c
+            - 'printf "%s" "$$PROXY_CONTROL_DISCORD_WEBHOOK_URL" > /secrets/discord_webhook_url && echo ok'
+        environment:
+            PROXY_CONTROL_DISCORD_WEBHOOK_URL: ${PROXY_CONTROL_DISCORD_WEBHOOK_URL:-}
+        volumes:
+            - alertmanager_dev:/secrets
+        restart: 'no'
+
+    proxy-control-alertmanager:
+        image: prom/alertmanager:v0.28.0
+        container_name: proxy-control-alertmanager
+        command:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+        volumes:
+            - ../observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+            - alertmanager_dev:/etc/alertmanager/secrets:ro
+        depends_on:
+            proxy-control-alertmanager-init:
+                condition: service_completed_successfully
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+    proxy-control-grafana:
+        image: grafana/grafana:latest
+        container_name: proxy-control-grafana
+        environment:
+            GF_AUTH_ANONYMOUS_ENABLED: 'true'
+            GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+            GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+        volumes:
+            - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+            - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+            - grafana_dev:/var/lib/grafana
+        ports:
+            - '${GRAFANA_PORT:-13000}:3000'
+        depends_on:
+            - proxy-control-prometheus
+            - proxy-control-loki
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+volumes:
+    pgdata_dev:
+    prometheus_dev:
+    loki_dev:
+    alloy_dev:
+    alertmanager_dev:
+    grafana_dev:
+
+networks:
+    proxy-control-net:
+        name: proxy-control-dev-net

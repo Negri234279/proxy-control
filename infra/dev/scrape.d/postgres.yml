@@ -1,0 +1,5 @@
+# Scrape extra SOLO de dev: el Postgres local del stack (en prod lo scrapea el exporter
+# del core sobre el Postgres compartido).
+- job_name: proxy-control-postgres
+  static_configs:
+      - targets: ['proxy-control-postgres-exporter:9187']

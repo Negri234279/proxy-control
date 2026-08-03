@@ -27,6 +27,6 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
         maxAge: SESSION_MAX_AGE,
         secure: env.NODE_ENV === 'production',
     })
-    
+
     return redirect('/', 303)
 }

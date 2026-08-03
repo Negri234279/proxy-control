@@ -352,7 +352,7 @@ En `src/pages/api/**`, JSON, con `http/error-response.ts` (`json`, `readJson`,
 
 ---
 
-## 9. Infra / Docker
+## 9. Infra / Docker — ✅ HECHO
 
 Dos entornos de primera clase: **dev** (todo autocontenido en local) y **prod**
 (integrado con el core de `pi-infra`). Sigue el patrón de `apps/wake-lan-app` (sin
@@ -385,31 +385,29 @@ scripts/sync-pi-infra.sh     # ✅ HECHO — contrato de sync a pi-infra (ver 9.
 .github/workflows/docker-publish.yml  # build+push de la imagen (negrii/proxy-control:latest)
 ```
 
-### 9.1 Dev — stack completo sin pgbouncer
-`infra/dev/compose.yml` **autocontenido**, redes propias (no toca el core):
-- [ ] `proxy-control` (target `dev` del Dockerfile, hot reload por volumen), `PORT 4321`.
-- [ ] `postgres:16-alpine` **directo, SIN pgbouncer** (no necesario en dev). La app
-  apunta `DATABASE_URL` a `postgres:5432` con `search_path=proxy_control`.
-- [ ] Observabilidad local COMPLETA: `grafana` (:3000), `prometheus`, `loki`, `alloy`
-  (lee `/var/run/docker.sock` para logs). Grafana con provisioning apuntando al
-  prometheus/loki locales para probar dashboards antes de subirlos.
-- [ ] Migraciones al arranque (entrypoint o job `db:migrate`).
+### 9.1 Dev — stack completo sin pgbouncer — [x]
+`infra/dev/compose.yml` **autocontenido**, red propia (`proxy-control-dev-net`):
+- [x] `proxy-control` (target `dev`, hot reload por montajes de subruta — sin tapar el
+  `node_modules` de la imagen). Command: `db:migrate` (tsx) + `astro dev`.
+- [x] `proxy-control-postgres` **directo, SIN pgbouncer** + `postgres-exporter`
+  (scrape.d de dev). `DATABASE_URL` → `proxy-control-postgres:5432` (el ORM cualifica por
+  esquema, no hace falta `search_path`).
+- [x] Obs local COMPLETA: `grafana` (:13000), `prometheus` (:19090), `loki` (:13100),
+  `alloy`, `alertmanager`. Secretos de NPM/CF/Mikrotik/auth reutilizados del `.env` raíz.
+- [x] `docker compose config` válido.
 
-### 9.2 Prod — app + obs propia, DB/pgbouncer/Grafana del core
-`infra/prod/compose.yml`: **NO despliega** postgres, pgbouncer ni grafana (los pone el
-core). Servicios prefijados `proxy-control-`:
-- [ ] `proxy-control` (imagen `negrii/proxy-control:latest`, `pull_policy: always`,
-  label watchtower). Runtime → **`pgbouncer:6432`**; migraciones → **`postgres:5432`**
-  directo (bypass del pooler). Se expone por el **NPM del core** (no publica puertos).
-- [ ] `proxy-control-prometheus`, `proxy-control-loki`, `proxy-control-alloy` montando
-  `./observability/...` (tras el sync; en el repo es `../observability`, ver 9.3).
-- [ ] (Opcional) `proxy-control-alertmanager` con su propio webhook de Discord.
-- [ ] Redes **externas** del core: `db` (postgres/pgbouncer) y `monitoring` (para que la
-  Grafana del core consulte `proxy-control-prometheus`/`-loki` como datasources).
-  Ambas las crea `pi-infra/scripts/create-network.sh` — solo se **unen**, no se crean.
-- [ ] Secretos en `proxy-control.env` **solo en la Pi** (gitignored; `*.env.example` sí
-  se versiona). Provisión del rol+DB en el Postgres del core vía
-  `apps/proxy-control/postgres/provision.env` (patrón del core).
+### 9.2 Prod — app + obs propia, DB/pgbouncer/Grafana del core — [x]
+`infra/prod/compose.yml`: **NO despliega** postgres, pgbouncer ni grafana. Servicios `proxy-control-*`:
+- [x] `proxy-control-migrate` (one-shot, MISMA imagen, `node migrate.mjs`, red `db` →
+  `postgres:5432` directo) corre antes del app (`service_completed_successfully`). El
+  Dockerfile copia `drizzle/` + `migrate.mjs` al runtime para migrar sin tsx.
+- [x] `proxy-control` (imagen `negrii/proxy-control:latest`, `pull_policy: always`, label
+  watchtower). Runtime → **`pgbouncer:6432`** (vía `DATABASE_URL` en el env). Sin puertos
+  (se expone por el NPM del core).
+- [x] `proxy-control-{prometheus,loki,alloy}` + `alertmanager` montando `../observability/...`.
+- [x] Redes **externas** del core: `db` + `monitoring` (solo se unen).
+- [x] Secretos en `proxy-control.env` (Pi); `proxy-control.env.example` +
+  `postgres/provision.env.example` versionados. `docker compose config` válido.
 
 ### 9.3 Sync a pi-infra (por PR) — sin subnivel prod
 - [x] `scripts/sync-pi-infra.sh` adaptado a `proxy-control` (contrato):
@@ -419,14 +417,20 @@ core). Servicios prefijados `proxy-control-`:
   - dashboards `*.json` (menos `postgresql-9628.json`) → `core/grafana/dashboards/proxy-control/`.
   - datasources → `core/grafana/provisioning/datasources/proxy-control.yml`.
   - Cablea el include raíz `- apps/proxy-control/compose.yml` (idempotente).
-- [ ] `.github/workflows/sync-pi-infra.yml`: en push a `main` que toque `infra/**` o el
-  script, checkout de proxy-control + pi-infra (`Negri234279/pi-infra` con
+- [x] Validado contra un pi-infra de prueba: produce `apps/proxy-control/{compose.yml,
+  observability/,postgres/,scrape.d/}`, `core/grafana/dashboards/proxy-control/*.json`,
+  `core/grafana/provisioning/datasources/proxy-control.yml` y cablea el include raíz.
+- [x] `.github/workflows/sync-pi-infra.yml`: push a `master/main` que toque `infra/**` o el
+  script → checkout de proxy-control + pi-infra (`Negri234279/pi-infra` con
   `PI_INFRA_SYNC_TOKEN`), ejecuta el script, abre PR (`create-pull-request`) y auto-merge.
-  Branch `sync/proxy-control-infra`. (Modelar sobre el workflow de powerlog.)
+  Branch `sync/proxy-control-infra`.
+- [x] `.github/workflows/docker-publish.yml`: build+push multi-arch (amd64+arm64) de
+  `negrii/proxy-control:{latest,<version>}` con buildx/QEMU (secret `DOCKERHUB_TOKEN`).
+- [x] Scripts `docker:dev` / `docker:prod` en `package.json`. Prod se levanta desde el
+  ROOT compose de pi-infra tras el sync.
 
-- [ ] Scripts `docker:dev` / `docker:prod` en `package.json`
-  (`docker compose -f infra/dev/compose.yml ...` / `-f infra/prod/compose.yml ...`).
-  Prod normalmente se levanta desde el ROOT compose de pi-infra tras el sync.
+> Requisitos de CI (secretos del repo): `PI_INFRA_SYNC_TOKEN` (PAT con contents+PR write
+> sobre pi-infra) y `DOCKERHUB_TOKEN` (push a Docker Hub).
 
 ---
 

@@ -44,7 +44,7 @@ export function verifySession(token: string | undefined): boolean {
     if (!safeEqual(signature, sign(payload))) {
         return false
     }
-    
+
     try {
         const data = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { exp?: number }
         return typeof data.exp === 'number' && data.exp > Date.now()

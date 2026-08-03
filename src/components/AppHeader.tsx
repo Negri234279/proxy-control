@@ -15,7 +15,7 @@ function relativeAge(from: number, now: number): string {
     if (seconds < 60) {
         return `hace ${seconds}s`
     }
-    
+
     return `hace ${Math.round(seconds / 60)} min`
 }
 

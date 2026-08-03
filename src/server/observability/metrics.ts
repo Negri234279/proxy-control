@@ -30,7 +30,7 @@ export async function collectMetrics(): Promise<string> {
     }
 
     domainsGauge.reset()
-    
+
     for (const [state, value] of counts) {
         domainsGauge.set({ state }, value)
     }

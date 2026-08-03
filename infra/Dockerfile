@@ -58,6 +58,12 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 
+# Migraciones en prod desde la MISMA imagen (sin tsx): las SQL de `drizzle/` + un runner
+# ESM plano. `migrate.ts` no tiene sintaxis TS (solo imports/await), así que se copia como
+# `.mjs` y lo ejecuta `node migrate.mjs`. El servicio one-shot de prod lo lanza antes del app.
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/src/server/db/migrate.ts ./migrate.mjs
+
 # Corre como usuario sin privilegios (el usuario `node` existe en la imagen base).
 USER node
 
