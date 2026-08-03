@@ -100,13 +100,18 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                     type="radio"
                                     name="visibility"
                                     checked={form.visibility === value}
-                                    disabled={mode === 'edit'}
                                     onChange={() => create.setField('visibility', value)}
                                 />
                                 {value === 'public' ? 'Público' : 'Privado'}
                             </label>
                         ))}
                     </div>
+                    {mode === 'edit' ? (
+                        <p class="mt-1 text-xs" style={{ color: 'var(--color-drift)' }}>
+                            ⚠ Cambiar el tipo borra el DNS del proveedor antiguo (Cloudflare/Mikrotik) y crea el nuevo
+                            al guardar.
+                        </p>
+                    ) : null}
                 </div>
 
                 <div>

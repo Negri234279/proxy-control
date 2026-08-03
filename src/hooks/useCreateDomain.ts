@@ -149,6 +149,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
         try {
             if (mode === 'edit' && editingId) {
                 const body: UpdateDomainBody = {
+                    visibility: form.visibility,
                     forwardScheme: form.forwardScheme,
                     forwardHost: form.forwardHost,
                     forwardPort: Number(form.forwardPort),

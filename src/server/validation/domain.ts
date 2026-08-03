@@ -60,6 +60,7 @@ const createSchema = z
 
 const updateSchema = z
     .object({
+        visibility: z.enum(['public', 'private']).optional(),
         forwardScheme: z.enum(['http', 'https']).optional(),
         forwardHost: forwardHostSchema.optional(),
         forwardPort: forwardPortSchema.optional(),

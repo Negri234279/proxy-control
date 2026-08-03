@@ -52,6 +52,7 @@ export interface CreateDomainBody {
 }
 
 export interface UpdateDomainBody {
+    visibility?: 'public' | 'private'
     forwardScheme?: ForwardScheme
     forwardHost?: string
     forwardPort?: number
