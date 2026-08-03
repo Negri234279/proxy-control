@@ -1,4 +1,5 @@
 import type { useCreateDomain } from '../hooks/useCreateDomain'
+import { useNpmCertificates } from '../hooks/useNpmCertificates'
 import type { CfRecordType, ForwardScheme, NpmOptions } from '../lib/domain-types'
 import { Modal } from './Modal'
 import { Spinner } from './Spinner'
@@ -37,6 +38,8 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export function DomainFormModal({ create }: { create: CreateDomain }) {
+    const certificates = useNpmCertificates()
+
     if (!create.isOpen) {
         return null
     }
@@ -44,6 +47,7 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
     const { form, fieldErrors, mode } = create
     const meta = TITLES[mode]
     const isPublic = form.visibility === 'public'
+    const showCertPicker = isPublic && mode !== 'edit'
 
     return (
         <Modal
@@ -202,15 +206,40 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                     </fieldset>
                 ) : null}
 
-                <p
-                    class="rounded-md px-3 py-2 text-xs text-[var(--color-muted)]"
-                    style={{ backgroundColor: 'var(--color-surface-2)' }}
-                >
-                    ℹ SSL:{' '}
-                    {isPublic
-                        ? 'se emitirá un certificado nuevo de Let’s Encrypt para este host.'
-                        : 'usa el certificado wildcard existente *.negri.es (DNS-01). No emite uno nuevo.'}
-                </p>
+                {showCertPicker ? (
+                    <div>
+                        <label class="mb-1 block text-sm font-medium">Certificado SSL</label>
+                        <select
+                            class={inputClass}
+                            style={inputStyle}
+                            value={form.certificateId}
+                            onChange={(event) =>
+                                create.setField('certificateId', (event.target as HTMLSelectElement).value)
+                            }
+                        >
+                            <option value="new">Solicitar uno nuevo (Let’s Encrypt)</option>
+                            {certificates.map((certificate) => (
+                                <option key={certificate.id} value={String(certificate.id)}>
+                                    {certificate.niceName}
+                                </option>
+                            ))}
+                        </select>
+                        <p class="mt-1 text-xs text-[var(--color-muted)]">
+                            «Nuevo» emite un certificado por hostname; o elige uno existente (p. ej. el wildcard
+                            *.negri.es) para no depender de la emisión por host.
+                        </p>
+                    </div>
+                ) : (
+                    <p
+                        class="rounded-md px-3 py-2 text-xs text-[var(--color-muted)]"
+                        style={{ backgroundColor: 'var(--color-surface-2)' }}
+                    >
+                        ℹ SSL:{' '}
+                        {isPublic
+                            ? 'se emitirá un certificado nuevo de Let’s Encrypt para este host.'
+                            : 'usa el certificado wildcard existente *.negri.es (DNS-01). No emite uno nuevo.'}
+                    </p>
+                )}
             </div>
         </Modal>
     )

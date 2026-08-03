@@ -9,13 +9,14 @@ import { resolveWildcardCertificateId } from './wildcard-certificate'
 // Traduce una fila `Domain` (estado deseado en DB) a los inputs concretos de cada
 // proveedor. Compartido por el alta y la reconciliación para no duplicar el mapeo.
 
-// public → 'new' (cert nuevo de Let's Encrypt); private → id del wildcard (DNS-01).
+// Prioridad: cert elegido explícitamente (columna certificate_id) > default por tipo.
+// public sin elección → 'new' (cert nuevo de Let's Encrypt); private → wildcard (DNS-01).
 export async function desiredCertificateId(domain: Domain): Promise<number | 'new'> {
-    if (domain.visibility === 'public') {
-        return 'new'
-    }
     if (domain.certificateId) {
         return domain.certificateId
+    }
+    if (domain.visibility === 'public') {
+        return 'new'
     }
     return resolveWildcardCertificateId(domain.hostname)
 }

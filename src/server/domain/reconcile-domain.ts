@@ -53,24 +53,38 @@ async function ensurePrivateDns(domain: Domain, updates: Partial<NewDomain>): Pr
 }
 
 async function ensureNpm(domain: Domain, updates: Partial<NewDomain>): Promise<void> {
-    const certificateId = await desiredCertificateId(domain)
-    if (typeof certificateId === 'number') {
-        updates.certificateId = certificateId
+    const hosts = await listProxyHosts()
+    const existing = hosts.find((host) => host.domain_names.includes(domain.hostname))
+
+    let certificateId = await desiredCertificateId(domain)
+    // Si íbamos a pedir 'new' pero el host ya tiene un cert válido, reutilízalo (no re-emitir).
+    if (certificateId === 'new' && existing && existing.certificate_id > 0) {
+        certificateId = existing.certificate_id
     }
 
     const input = desiredProxyHostInput(domain, certificateId)
-    const hosts = await listProxyHosts()
-    const existing = hosts.find((host) => host.domain_names.includes(domain.hostname))
 
     if (!existing) {
         const created = await createProxyHost(input)
         updates.npmProxyId = created.id
+        // NPM NO aplica force_ssl/hsts/http2 en el insert mientras el cert no esté asignado
+        // (con 'new' se asigna DESPUÉS). Con el cert ya real, re-aplicamos la config una vez.
+        if (created.certificate_id > 0) {
+            updates.certificateId = created.certificate_id
+            await updateProxyHost(created.id, { ...input, certificateId: created.certificate_id })
+        }
         return
     }
 
-    await updateProxyHost(existing.id, input)
-
-    updates.npmProxyId = existing.id
+    const updated = await updateProxyHost(existing.id, input)
+    updates.npmProxyId = updated.id
+    if (updated.certificate_id > 0) {
+        updates.certificateId = updated.certificate_id
+        // Si el cert se acaba de asignar en este update (venía 'new'), re-aplica los flags SSL.
+        if (certificateId === 'new') {
+            await updateProxyHost(updated.id, { ...input, certificateId: updated.certificate_id })
+        }
+    }
 }
 
 export async function reconcileDomain(id: string): Promise<Domain> {

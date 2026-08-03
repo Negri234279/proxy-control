@@ -30,6 +30,12 @@ export interface DomainRecord {
     npmProxyId: number | null
 }
 
+export interface NpmCertificateOption {
+    id: number
+    niceName: string
+    domainNames: string[]
+}
+
 export interface CreateDomainBody {
     hostname: string
     visibility: 'public' | 'private'
@@ -38,6 +44,7 @@ export interface CreateDomainBody {
     forwardPort: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
+    certificateId?: number | 'new'
     cfRecordType?: CfRecordType
     cfContent?: string
     cfProxied?: boolean
@@ -89,4 +96,6 @@ export const api = {
         req<{ domain: DomainRecord }>(`/api/domains/${id}/reconcile`, { method: 'POST' }).then((r) => r.domain),
     reconcileAll: () =>
         req<{ results: ReconcileResultItem[] }>('/api/reconcile', { method: 'POST' }).then((r) => r.results),
+    certificates: () =>
+        req<{ certificates: NpmCertificateOption[] }>('/api/npm/certificates').then((r) => r.certificates),
 }

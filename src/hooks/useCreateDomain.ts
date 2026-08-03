@@ -18,6 +18,8 @@ export interface DomainForm {
     forwardHost: string
     forwardPort: string
     npmOptions: NpmOptions
+    // 'new' = solicitar cert nuevo (LE); o el id (string) de un cert existente en NPM.
+    certificateId: string
     cfRecordType: CfRecordType
     cfContent: string
     cfProxied: boolean
@@ -30,6 +32,7 @@ const emptyForm = (): DomainForm => ({
     forwardHost: '',
     forwardPort: '',
     npmOptions: { ...DEFAULT_NPM_OPTIONS },
+    certificateId: 'new',
     cfRecordType: 'A',
     cfContent: '',
     cfProxied: true,
@@ -136,6 +139,8 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                         body.cfContent = form.cfContent
                     }
                     body.cfProxied = form.cfProxied
+                    // Certificado: 'new' (nuevo LE) o el id de uno existente en NPM.
+                    body.certificateId = form.certificateId === 'new' ? 'new' : Number(form.certificateId)
                 }
 
                 await api.createDomain(body)
@@ -148,7 +153,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             await refetch()
         } catch (error) {
             const apiError = error as ApiError
-            
+
             if (apiError.status === 400 && apiError.fields) {
                 setFieldErrors(apiError.fields)
             } else {

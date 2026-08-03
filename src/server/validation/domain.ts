@@ -38,6 +38,7 @@ const createSchema = z
         forwardPort: forwardPortSchema,
         npmOptions: npmOptionsSchema.optional(),
         customLocations: z.array(customLocationSchema).optional(),
+        certificateId: z.union([z.literal('new'), z.number().int().positive()]).optional(),
         cfRecordType: z.enum(['A', 'CNAME']).optional(),
         cfContent: z.string().min(1).optional(),
         cfProxied: z.boolean().optional(),

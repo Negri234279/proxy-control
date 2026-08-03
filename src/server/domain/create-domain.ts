@@ -20,6 +20,9 @@ export interface CreateDomainInput {
     forwardPort: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
+    // Certificado SSL: 'new' (solicitar uno nuevo de Let's Encrypt) o el id de un cert
+    // existente en NPM (p. ej. el wildcard *.negri.es). undefined = default por tipo.
+    certificateId?: number | 'new'
     // Solo público:
     cfRecordType?: CfRecordType
     cfContent?: string
@@ -37,6 +40,9 @@ function isUniqueViolation(error: unknown): boolean {
 // la fila queda en 'error' y se devuelve igualmente para reintentar con el botón.
 export async function createDomain(input: CreateDomainInput): Promise<Domain> {
     const isPublic = input.visibility === 'public'
+    const usesExistingCert = typeof input.certificateId === 'number'
+    // sslMode es informativo: 'new' solo si es público y va a emitir cert nuevo.
+    const sslMode = isPublic && !usesExistingCert ? 'new' : 'wildcard'
 
     const row: NewDomain = {
         hostname: input.hostname,
@@ -46,7 +52,9 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         forwardPort: input.forwardPort,
         npmOptions: input.npmOptions ?? DEFAULT_NPM_OPTIONS,
         customLocations: input.customLocations ?? [],
-        sslMode: isPublic ? 'new' : 'wildcard',
+        // Cert elegido: número = existente; 'new'/undefined = solicitar nuevo (público).
+        certificateId: usesExistingCert ? (input.certificateId as number) : null,
+        sslMode,
         cfRecordType: input.cfRecordType ?? 'A',
         cfContent: isPublic ? (input.cfContent ?? env.PUBLIC_IP ?? null) : null,
         cfProxied: input.cfProxied ?? true,
