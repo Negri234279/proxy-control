@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import { api } from '../lib/api'
-import type { DomainListItem, DomainStatusItem, ReconcileState } from '../lib/domain-types'
+import type { DomainListItem, DomainStatusItem } from '../lib/domain-types'
 
 export type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -24,13 +24,22 @@ export function useDomains() {
         void refetch()
     }, [refetch])
 
-    // Polling: parchea solo el estado de los que ya están en la tabla.
+    // Polling: parchea el estado (agregado + por proveedor) de los que ya están en la tabla.
     const applyStatusSnapshot = useCallback((snapshot: DomainStatusItem[]) => {
-        const byId = new Map<string, ReconcileState>(snapshot.map((item) => [item.id, item.reconcileState]))
+        const byId = new Map(snapshot.map((item) => [item.id, item]))
+
         setDomains((prev) =>
-            prev.map((domain) =>
-                domain.id && byId.has(domain.id) ? { ...domain, reconcileState: byId.get(domain.id) ?? null } : domain,
-            ),
+            prev.map((domain) => {
+                const status = domain.id ? byId.get(domain.id) : undefined
+                if (!status) return domain
+
+                return {
+                    ...domain,
+                    reconcileState: status.reconcileState,
+                    npmState: status.npmState,
+                    dnsState: status.dnsState,
+                }
+            }),
         )
     }, [])
 
@@ -38,5 +47,11 @@ export function useDomains() {
         setDomains((prev) => prev.map((domain) => (domain.id === id ? { ...domain, ...patch } : domain)))
     }, [])
 
-    return { status, domains, refetch, applyStatusSnapshot, patchRow }
+    return {
+        status,
+        domains,
+        refetch,
+        applyStatusSnapshot,
+        patchRow,
+    }
 }

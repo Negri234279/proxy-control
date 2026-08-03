@@ -38,6 +38,8 @@ export const DEFAULT_NPM_OPTIONS: NpmOptions = {
 // ── Formas de vista compartidas front/back (respuestas de la API) ──
 
 // Fila de la tabla: NPM cruzado con la DB (id null = host de NPM sin clasificar).
+// `reconcileState` es el agregado (glow de la fila); `npmState`/`dnsState` son el estado
+// por proveedor (cada badge usa el suyo). Null en dominios sin clasificar.
 export interface DomainListItem {
     id: string | null
     hostname: string
@@ -46,16 +48,20 @@ export interface DomainListItem {
     forwardHost: string | null
     forwardPort: number | null
     reconcileState: ReconcileState | null
+    npmState: ReconcileState | null
+    dnsState: ReconcileState | null
     npmProxyId: number | null
     enabledInNpm: boolean
 }
 
-// Snapshot de estado para el polling (solo DB).
+// Snapshot de estado para el polling (chequeo en vivo).
 export interface DomainStatusItem {
     id: string
     hostname: string
     visibility: Visibility
     reconcileState: ReconcileState
+    npmState: ReconcileState
+    dnsState: ReconcileState
     lastReconciledAt: string | null
 }
 

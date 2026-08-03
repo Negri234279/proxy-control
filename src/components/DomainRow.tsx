@@ -52,7 +52,10 @@ function IconButton({
 export function DomainRow(props: Props) {
     const { row, reconciling, expanded, detail, detailLoading } = props
     const isUnclassified = row.visibility === 'unclassified'
+    // Glow de la fila = estado agregado; cada badge usa el de su proveedor.
     const rowState: RowState = reconciling ? 'checking' : (row.reconcileState ?? 'unclassified')
+    const npmState: RowState = reconciling ? 'checking' : (row.npmState ?? 'unclassified')
+    const dnsState: RowState = reconciling ? 'checking' : (row.dnsState ?? 'unclassified')
     const meta = stateMeta(rowState)
     const provider = dnsProviderLabel(row.visibility)
     const canExpand = Boolean(row.id) && !isUnclassified
@@ -86,13 +89,13 @@ export function DomainRow(props: Props) {
                     <VisibilityPill visibility={row.visibility} />
                 </td>
                 <td class="px-3 py-3">
-                    <StatusBadge state={isUnclassified ? 'unclassified' : rowState} />
+                    <StatusBadge state={isUnclassified ? 'unclassified' : npmState} />
                 </td>
                 <td class="px-3 py-3">
                     {isUnclassified ? (
                         <span class="text-[var(--color-neutral)]">—</span>
                     ) : (
-                        <StatusBadge state={rowState} provider={provider} />
+                        <StatusBadge state={dnsState} provider={provider} />
                     )}
                 </td>
                 <td class="py-3 pr-4 pl-3">

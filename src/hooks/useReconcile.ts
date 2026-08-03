@@ -19,11 +19,9 @@ export function useReconcile({ patchRow, refetch, pushToast, setPollingEnabled }
     const mark = useCallback((id: string, on: boolean) => {
         setReconcilingIds((prev) => {
             const next = new Set(prev)
-            if (on) {
-                next.add(id)
-            } else {
-                next.delete(id)
-            }
+
+            on ? next.add(id) : next.delete(id)
+
             return next
         })
     }, [])
@@ -31,16 +29,22 @@ export function useReconcile({ patchRow, refetch, pushToast, setPollingEnabled }
     const reconcileOne = useCallback(
         async (id: string, hostname: string) => {
             mark(id, true)
+
             try {
                 const domain = await api.reconcileOne(id)
-                patchRow(id, { reconcileState: domain.reconcileState })
-                if (domain.reconcileState === 'synced') {
-                    pushToast('success', `${hostname} sincronizado`)
-                } else {
-                    pushToast('info', `${hostname}: ${domain.reconcileState}`)
-                }
+                // Optimista: tras reconciliar ambos proveedores quedan en el mismo estado;
+                // el siguiente poll en vivo lo afina.
+                patchRow(id, {
+                    reconcileState: domain.reconcileState,
+                    npmState: domain.reconcileState,
+                    dnsState: domain.reconcileState,
+                })
+
+                domain.reconcileState === 'synced'
+                    ? pushToast('success', `${hostname} sincronizado`)
+                    : pushToast('info', `${hostname}: ${domain.reconcileState}`)
             } catch (error) {
-                patchRow(id, { reconcileState: 'error' })
+                patchRow(id, { reconcileState: 'error', npmState: 'error', dnsState: 'error' })
                 pushToast('error', `Reconciliar falló: ${hostname} — ${(error as ApiError).message}`)
             } finally {
                 mark(id, false)
@@ -52,11 +56,14 @@ export function useReconcile({ patchRow, refetch, pushToast, setPollingEnabled }
     const reconcileAll = useCallback(async () => {
         setFleetRunning(true)
         setPollingEnabled(false)
+
         try {
             const results = await api.reconcileAll()
             const synced = results.filter((result) => result.state === 'synced').length
             const failed = results.filter((result) => result.state === 'error').length
+
             await refetch()
+
             pushToast(failed > 0 ? 'error' : 'success', `Reconciliar todo: ${synced} OK, ${failed} con error`)
         } catch (error) {
             pushToast('error', `Reconciliar todo falló: ${(error as ApiError).message}`)
@@ -66,5 +73,10 @@ export function useReconcile({ patchRow, refetch, pushToast, setPollingEnabled }
         }
     }, [pushToast, refetch, setPollingEnabled])
 
-    return { reconcilingIds, fleetRunning, reconcileOne, reconcileAll }
+    return {
+        reconcilingIds,
+        fleetRunning,
+        reconcileOne,
+        reconcileAll,
+    }
 }

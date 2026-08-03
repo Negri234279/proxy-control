@@ -17,6 +17,8 @@ export async function listDomains(): Promise<DomainListItem[]> {
 
     for (const row of rows) {
         const host = hosts.find((candidate) => candidate.domain_names.includes(row.hostname))
+        const live = liveState.get(row.id)
+
         items.push({
             id: row.id,
             hostname: row.hostname,
@@ -24,19 +26,22 @@ export async function listDomains(): Promise<DomainListItem[]> {
             forwardScheme: row.forwardScheme,
             forwardHost: row.forwardHost,
             forwardPort: row.forwardPort,
-            reconcileState: liveState.get(row.id) ?? row.reconcileState,
+            reconcileState: live?.state ?? row.reconcileState,
+            npmState: live?.npm ?? null,
+            dnsState: live?.dns ?? null,
             npmProxyId: host?.id ?? row.npmProxyId,
             enabledInNpm: host ? host.enabled === true || host.enabled === 1 : false,
         })
+
         seen.add(row.hostname)
     }
 
     for (const host of hosts) {
         for (const name of host.domain_names) {
-            if (seen.has(name)) {
-                continue
-            }
+            if (seen.has(name)) continue
+
             seen.add(name)
+
             items.push({
                 id: null,
                 hostname: name,
@@ -45,8 +50,10 @@ export async function listDomains(): Promise<DomainListItem[]> {
                 forwardHost: host.forward_host,
                 forwardPort: host.forward_port,
                 reconcileState: null,
+                npmState: null,
+                dnsState: null,
                 npmProxyId: host.id,
-                enabledInNpm: host.enabled === 1,
+                enabledInNpm: host.enabled === true || host.enabled === 1,
             })
         }
     }

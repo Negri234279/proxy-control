@@ -9,15 +9,23 @@ import { computeFleetState } from '../reconcile/diff'
 // (p. ej. borrar una entrada DNS a mano). `lastReconciledAt` sigue siendo el de la DB.
 
 export async function listStatus(): Promise<DomainStatusItem[]> {
-    const rows = await db.select().from(domains)
-    const hosts = await listProxyHosts()
+    const rowsPromise = db.select().from(domains)
+    const hostsPromise = listProxyHosts()
+
+    const [rows, hosts] = await Promise.all([rowsPromise, hostsPromise])
     const liveState = await computeFleetState(rows, hosts)
 
-    return rows.map((row) => ({
-        id: row.id,
-        hostname: row.hostname,
-        visibility: row.visibility,
-        reconcileState: liveState.get(row.id) ?? row.reconcileState,
-        lastReconciledAt: row.lastReconciledAt?.toISOString() ?? null,
-    }))
+    return rows.map((row) => {
+        const live = liveState.get(row.id)
+
+        return {
+            id: row.id,
+            hostname: row.hostname,
+            visibility: row.visibility,
+            reconcileState: live?.state ?? row.reconcileState,
+            npmState: live?.npm ?? row.reconcileState,
+            dnsState: live?.dns ?? row.reconcileState,
+            lastReconciledAt: row.lastReconciledAt?.toISOString() ?? null,
+        }
+    })
 }
