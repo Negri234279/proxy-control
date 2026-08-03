@@ -21,6 +21,7 @@ const NPM_OPTION_LABELS: { key: keyof NpmOptions; label: string }[] = [
     { key: 'cacheAssets', label: 'Cache assets' },
     { key: 'http2', label: 'HTTP/2' },
     { key: 'hsts', label: 'HSTS' },
+    { key: 'hstsSubdomains', label: 'HSTS Subdomains' },
     { key: 'forceSsl', label: 'Force SSL' },
 ]
 

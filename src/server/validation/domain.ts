@@ -14,6 +14,8 @@ const npmOptionsSchema = z.object({
     cacheAssets: z.boolean(),
     http2: z.boolean(),
     hsts: z.boolean(),
+    // Lenient con clientes antiguos que no envíen el flag nuevo.
+    hstsSubdomains: z.boolean().default(false),
     forceSsl: z.boolean(),
 })
 

@@ -14,6 +14,7 @@ export interface NpmOptions {
     cacheAssets: boolean // caching_enabled
     http2: boolean // http2_support
     hsts: boolean // hsts_enabled
+    hstsSubdomains: boolean // hsts_subdomains (incluir subdominios en HSTS)
     forceSsl: boolean // ssl_forced
 }
 
@@ -32,6 +33,7 @@ export const DEFAULT_NPM_OPTIONS: NpmOptions = {
     cacheAssets: true,
     http2: true,
     hsts: true,
+    hstsSubdomains: false,
     forceSsl: true,
 }
 

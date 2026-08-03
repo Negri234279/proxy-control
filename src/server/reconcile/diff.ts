@@ -67,6 +67,10 @@ function npmDrift(domain: Domain, host: NpmProxyHost): string[] {
         issues.push('hsts difiere')
     }
 
+    if (intBool(host.hsts_subdomains) !== (domain.npmOptions.hstsSubdomains ?? false)) {
+        issues.push('hsts_subdomains difiere')
+    }
+
     if (intBool(host.ssl_forced) !== domain.npmOptions.forceSsl) {
         issues.push('force_ssl difiere')
     }
@@ -127,7 +131,7 @@ export function cloudflareCheck(domain: Domain, record: CfDnsRecord | undefined)
     }
 }
 
-export function mikrotikCheck(domain: Domain, entry: MikrotikDnsEntry | undefined): ProviderCheck {
+export function mikrotikCheck(entry: MikrotikDnsEntry | undefined): ProviderCheck {
     if (!entry) {
         return {
             present: false,
@@ -195,10 +199,7 @@ export async function diff(domain: Domain): Promise<DomainDiff> {
             dns = cloudflareCheck(domain, record ?? undefined)
         } else {
             const entries = await listStaticDns()
-            dns = mikrotikCheck(
-                domain,
-                entries.find((entry) => entry.name === domain.hostname),
-            )
+            dns = mikrotikCheck(entries.find((entry) => entry.name === domain.hostname))
         }
     } catch (error) {
         errored = true
@@ -286,7 +287,7 @@ export async function computeFleetState(domains: Domain[], hosts: NpmProxyHost[]
             dns = cloudflareError ? ERROR_CHECK : cloudflareCheck(domain, cfByName.get(domain.hostname))
         } else {
             dnsErrored = mikrotikError
-            dns = mikrotikError ? ERROR_CHECK : mikrotikCheck(domain, entryByName.get(domain.hostname))
+            dns = mikrotikError ? ERROR_CHECK : mikrotikCheck(entryByName.get(domain.hostname))
         }
 
         stateById.set(domain.id, {

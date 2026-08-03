@@ -21,6 +21,7 @@ export interface NpmProxyHost {
     caching_enabled: number | boolean
     http2_support: number | boolean
     hsts_enabled: number | boolean
+    hsts_subdomains: number | boolean
     ssl_forced: number | boolean
 }
 
@@ -106,7 +107,7 @@ function buildProxyHostBody(input: CreateProxyHostInput) {
         certificate_id: input.certificateId,
         ssl_forced: input.npmOptions.forceSsl,
         hsts_enabled: input.npmOptions.hsts,
-        hsts_subdomains: false,
+        hsts_subdomains: input.npmOptions.hstsSubdomains ?? false,
         http2_support: input.npmOptions.http2,
         block_exploits: input.npmOptions.blockExploits,
         caching_enabled: input.npmOptions.cacheAssets,
