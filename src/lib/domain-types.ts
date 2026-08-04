@@ -104,3 +104,35 @@ export interface DomainDiffView {
     enabledInNpm: boolean
     issues: string[]
 }
+
+// Fila completa de un dominio para la página de detalle (fechas como ISO strings tras JSON).
+export interface DomainDetailView {
+    id: string
+    hostname: string
+    visibility: Visibility
+    forwardScheme: ForwardScheme
+    forwardHost: string | null
+    forwardPort: number | null
+    npmOptions: NpmOptions
+    customLocations: CustomLocation[]
+    advancedConfig: string
+    sslMode: SslMode | null
+    certificateId: number | null
+    cfRecordType: CfRecordType
+    cfContent: string | null
+    cfProxied: boolean
+    npmProxyId: number | null
+    cloudflareRecordId: string | null
+    mikrotikDnsId: string | null
+    reconcileState: ReconcileState
+    lastReconciledAt: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+// Respuesta de GET /api/domains/:id (detalle + estado en vivo).
+export interface DomainDetailResponse {
+    domain: DomainDetailView
+    status: DomainDiffView
+    publicIp: string | null
+}

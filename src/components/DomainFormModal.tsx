@@ -2,7 +2,8 @@ import { useRef } from 'preact/hooks'
 import type { useCreateDomain } from '../hooks/useCreateDomain'
 import { useNpmCertificates } from '../hooks/useNpmCertificates'
 import { FORM_TABS, tabHasError, type FormTab } from '../lib/domain-form-tabs'
-import type { CfRecordType, ForwardScheme, NpmOptions } from '../lib/domain-types'
+import type { CfRecordType, ForwardScheme } from '../lib/domain-types'
+import { NPM_OPTION_LABELS } from '../lib/npm-options'
 import { Modal } from './Modal'
 import { Spinner } from './Spinner'
 import { Toggle } from './Toggle'
@@ -17,17 +18,6 @@ const TITLES: Record<CreateDomain['mode'], { title: string; cta: string }> = {
     classify: { title: 'Clasificar dominio', cta: 'Clasificar' },
     edit: { title: 'Editar dominio', cta: 'Guardar cambios' },
 }
-
-const NPM_OPTION_LABELS: { key: keyof NpmOptions; label: string }[] = [
-    { key: 'blockExploits', label: 'Block common exploits' },
-    { key: 'websockets', label: 'Websockets' },
-    { key: 'cacheAssets', label: 'Cache assets' },
-    { key: 'http2', label: 'HTTP/2' },
-    { key: 'hsts', label: 'HSTS' },
-    { key: 'hstsSubdomains', label: 'HSTS Subdomains' },
-    { key: 'forceSsl', label: 'Force SSL' },
-    { key: 'trustForwardedProto', label: 'Trust forwarded proto header' },
-]
 
 function FieldError({ message }: { message?: string }) {
     if (!message) {

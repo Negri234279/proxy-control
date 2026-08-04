@@ -1,28 +1,51 @@
 ---
 import '../../styles/global.css'
-import { ClientRouter } from 'astro:transitions'
-import { ActiveIndicator } from '../../components/ActiveIndicator'
-import { DomainDetailActions } from '../../components/DomainDetailActions'
-import { StatusBadge } from '../../components/StatusBadge'
-import { VisibilityPill } from '../../components/VisibilityPill'
-import type { ProviderCheck } from '../../server/reconcile/diff'
+import { DomainDetail } from '../../components/DomainDetail'
 import { getDomainOrThrow } from '../../server/domain/get-domain'
 import { diff } from '../../server/reconcile/diff'
 import { NotFoundError } from '../../server/errors'
 import { env } from '../../server/config/env'
-import type { Domain } from '../../server/db/schema'
-import type { DomainDiff } from '../../server/reconcile/diff'
-import { dnsProviderLabel } from '../../lib/reconcile-state'
-import type { DomainListItem, NpmOptions, ReconcileState } from '../../lib/domain-types'
+import type { DomainDetailResponse, DomainDetailView } from '../../lib/domain-types'
 
 const { id } = Astro.params
 
-let domain: Domain | null = null
-let status: DomainDiff | null = null
+// Datos iniciales para la isla (primer paint = SSR). Tras montar, la isla se refresca en
+// sitio contra GET /api/domains/:id sin recargar.
+let initial: DomainDetailResponse | null = null
 
 try {
-    domain = await getDomainOrThrow(id ?? '')
-    status = await diff(domain)
+    const domain = await getDomainOrThrow(id ?? '')
+    const status = await diff(domain)
+
+    const view: DomainDetailView = {
+        id: domain.id,
+        hostname: domain.hostname,
+        visibility: domain.visibility,
+        forwardScheme: domain.forwardScheme,
+        forwardHost: domain.forwardHost,
+        forwardPort: domain.forwardPort,
+        npmOptions: domain.npmOptions,
+        customLocations: domain.customLocations,
+        advancedConfig: domain.advancedConfig,
+        sslMode: domain.sslMode,
+        certificateId: domain.certificateId,
+        cfRecordType: domain.cfRecordType,
+        cfContent: domain.cfContent,
+        cfProxied: domain.cfProxied,
+        npmProxyId: domain.npmProxyId,
+        cloudflareRecordId: domain.cloudflareRecordId,
+        mikrotikDnsId: domain.mikrotikDnsId,
+        reconcileState: domain.reconcileState,
+        lastReconciledAt: domain.lastReconciledAt?.toISOString() ?? null,
+        createdAt: domain.createdAt.toISOString(),
+        updatedAt: domain.updatedAt.toISOString(),
+    }
+
+    initial = {
+        domain: view,
+        status,
+        publicIp: env.PUBLIC_IP ?? null,
+    }
 } catch (error) {
     if (error instanceof NotFoundError) {
         Astro.response.status = 404
@@ -30,55 +53,6 @@ try {
         throw error
     }
 }
-
-const NPM_OPTION_LABELS: { key: keyof NpmOptions; label: string }[] = [
-    { key: 'blockExploits', label: 'Block common exploits' },
-    { key: 'websockets', label: 'Websockets' },
-    { key: 'cacheAssets', label: 'Cache assets' },
-    { key: 'http2', label: 'HTTP/2' },
-    { key: 'hsts', label: 'HSTS' },
-    { key: 'hstsSubdomains', label: 'HSTS Subdomains' },
-    { key: 'forceSsl', label: 'Force SSL' },
-    { key: 'trustForwardedProto', label: 'Trust forwarded proto header' },
-]
-
-// ProviderCheck → estado para el badge.
-const providerState = (check: ProviderCheck): ReconcileState =>
-    !check.present ? 'missing' : check.drift ? 'drift' : 'synced'
-
-const fmtDate = (value: Date | null): string => (value ? new Date(value).toLocaleString('es-ES') : '—')
-
-const provider = domain ? dnsProviderLabel(domain.visibility) : null
-const isPublic = domain?.visibility === 'public'
-const upstream = domain?.forwardHost
-    ? `${domain.forwardScheme}://${domain.forwardHost}:${domain.forwardPort ?? ''}`
-    : '—'
-
-// Fila para la isla de acciones (mismo shape que la tabla), para reusar el form de edición
-// y el diálogo de borrado.
-const row: DomainListItem | null =
-    domain && status
-        ? {
-              id: domain.id,
-              hostname: domain.hostname,
-              visibility: domain.visibility,
-              forwardScheme: domain.forwardScheme,
-              forwardHost: domain.forwardHost,
-              forwardPort: domain.forwardPort,
-              reconcileState: domain.reconcileState,
-              npmState: null,
-              dnsState: null,
-              npmProxyId: domain.npmProxyId,
-              enabledInNpm: status.enabledInNpm,
-              npmOptions: domain.npmOptions,
-              customLocations: domain.customLocations,
-              advancedConfig: domain.advancedConfig,
-              certificateId: domain.certificateId,
-              cfRecordType: domain.cfRecordType,
-              cfContent: domain.cfContent,
-              cfProxied: domain.cfProxied,
-          }
-        : null
 ---
 
 <html lang="es">
@@ -87,20 +61,20 @@ const row: DomainListItem | null =
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="generator" content={Astro.generator} />
-        <title>{domain ? `${domain.hostname} · proxy-control` : 'Dominio no encontrado'}</title>
-        <ClientRouter />
+        <title>{initial ? `${initial.domain.hostname} · proxy-control` : 'Dominio no encontrado'}</title>
     </head>
     <body>
-        <div class="mx-auto max-w-3xl px-4 py-8">
-            <a
-                href="/"
-                class="mb-6 inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-text)]"
-            >
-                ← Dominios
-            </a>
-
-            {
-                !domain || !status ? (
+        {
+            initial ? (
+                <DomainDetail client:load initial={initial} />
+            ) : (
+                <div class="mx-auto max-w-3xl px-4 py-8">
+                    <a
+                        href="/"
+                        class="mb-6 inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-text)]"
+                    >
+                        ← Dominios
+                    </a>
                     <div
                         class="rounded-[var(--radius-card)] border px-6 py-16 text-center"
                         style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
@@ -110,218 +84,8 @@ const row: DomainListItem | null =
                             No existe un dominio con ese id, o fue eliminado.
                         </p>
                     </div>
-                ) : (
-                    <div class="flex flex-col gap-5">
-                        <header class="flex flex-col gap-3">
-                            <div class="flex flex-wrap items-center gap-3">
-                                <h1 class="text-xl font-semibold">{domain.hostname}</h1>
-                                <VisibilityPill visibility={domain.visibility} />
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <StatusBadge state={providerState(status.npm)} provider="NPM" />
-                                <StatusBadge state={providerState(status.dns)} provider={provider} />
-                                <ActiveIndicator
-                                    present={status.npm.present}
-                                    enabled={status.enabledInNpm}
-                                    pending={false}
-                                />
-                            </div>
-                            <p class="text-xs text-[var(--color-muted)]">
-                                Última reconciliación: {fmtDate(domain.lastReconciledAt)}
-                            </p>
-
-                            <DomainDetailActions client:load row={row!} />
-                        </header>
-
-                        <section
-                            class="rounded-[var(--radius-card)] border p-4"
-                            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                        >
-                            <h2 class="mb-3 text-sm font-semibold">Estado de sincronización</h2>
-                            <div class="flex flex-col gap-3 text-sm">
-                                <div>
-                                    <span class="font-medium">NPM:</span> {status.npm.present ? 'presente' : 'ausente'}
-                                    {status.npm.drift ? ' — drift' : ''}
-                                    {status.npm.reasons && status.npm.reasons.length > 0 ? (
-                                        <ul
-                                            class="mt-1 ml-4 flex list-disc flex-col gap-0.5 text-xs"
-                                            style={{ color: 'var(--color-drift)' }}
-                                        >
-                                            {status.npm.reasons.map((reason) => (
-                                                <li>{reason}</li>
-                                            ))}
-                                        </ul>
-                                    ) : null}
-                                </div>
-                                <div>
-                                    <span class="font-medium">DNS ({provider}):</span>{' '}
-                                    {status.dns.present ? 'presente' : 'ausente'}
-                                    {status.dns.drift ? ' — drift' : ''}
-                                    {status.dns.reasons && status.dns.reasons.length > 0 ? (
-                                        <ul
-                                            class="mt-1 ml-4 flex list-disc flex-col gap-0.5 text-xs"
-                                            style={{ color: 'var(--color-drift)' }}
-                                        >
-                                            {status.dns.reasons.map((reason) => (
-                                                <li>{reason}</li>
-                                            ))}
-                                        </ul>
-                                    ) : null}
-                                </div>
-                                {status.issues.length === 0 ? (
-                                    <p class="text-xs text-[var(--color-muted)]">Sin incidencias.</p>
-                                ) : null}
-                            </div>
-                        </section>
-
-                        <section
-                            class="rounded-[var(--radius-card)] border p-4"
-                            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                        >
-                            <h2 class="mb-3 text-sm font-semibold">Detalles</h2>
-                            <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Visibilidad</dt>
-                                    <dd>{domain.visibility}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Upstream</dt>
-                                    <dd class="font-mono text-xs">{upstream}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Estado reconcile (DB)</dt>
-                                    <dd>{domain.reconcileState}</dd>
-                                </div>
-                            </dl>
-                        </section>
-
-                        <section
-                            class="rounded-[var(--radius-card)] border p-4"
-                            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                        >
-                            <h2 class="mb-3 text-sm font-semibold">Opciones NPM</h2>
-                            <ul class="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-2">
-                                {NPM_OPTION_LABELS.map((option) => (
-                                    <li class="flex items-center gap-2">
-                                        <span
-                                            aria-hidden="true"
-                                            style={{
-                                                color: domain!.npmOptions[option.key]
-                                                    ? 'var(--color-synced)'
-                                                    : 'var(--color-muted)',
-                                            }}
-                                        >
-                                            {domain!.npmOptions[option.key] ? '✔' : '✕'}
-                                        </span>
-                                        <span>{option.label}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                            {domain.advancedConfig ? (
-                                <div class="mt-3">
-                                    <p class="mb-1 text-xs text-[var(--color-muted)]">Config Nginx avanzada</p>
-                                    <pre
-                                        class="overflow-x-auto rounded-md border p-2 font-mono text-xs"
-                                        style={{ borderColor: 'var(--color-border)' }}
-                                    >
-                                        {domain.advancedConfig}
-                                    </pre>
-                                </div>
-                            ) : null}
-                        </section>
-
-                        <section
-                            class="rounded-[var(--radius-card)] border p-4"
-                            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                        >
-                            <h2 class="mb-3 text-sm font-semibold">Ubicaciones personalizadas</h2>
-                            {domain.customLocations.length === 0 ? (
-                                <p class="text-sm text-[var(--color-muted)]">Ninguna. Todo va al upstream principal.</p>
-                            ) : (
-                                <ul class="flex flex-col gap-2">
-                                    {domain.customLocations.map((location) => (
-                                        <li
-                                            class="rounded-md border p-2 text-xs"
-                                            style={{ borderColor: 'var(--color-border)' }}
-                                        >
-                                            <span class="font-mono font-medium">{location.path}</span>
-                                            <span class="text-[var(--color-muted)]">
-                                                {' '}
-                                                → {location.forwardScheme}://{location.forwardHost}:
-                                                {location.forwardPort}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </section>
-
-                        <section
-                            class="rounded-[var(--radius-card)] border p-4"
-                            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                        >
-                            <h2 class="mb-3 text-sm font-semibold">DNS y SSL</h2>
-                            {isPublic ? (
-                                <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                                    <div>
-                                        <dt class="text-xs text-[var(--color-muted)]">Registro Cloudflare</dt>
-                                        <dd class="font-mono text-xs">
-                                            {domain.cfRecordType} →{' '}
-                                            {domain.cfContent ?? `(PUBLIC_IP: ${env.PUBLIC_IP ?? '—'})`}
-                                        </dd>
-                                    </div>
-                                    <div>
-                                        <dt class="text-xs text-[var(--color-muted)]">Proxied</dt>
-                                        <dd>{domain.cfProxied ? 'sí (naranja)' : 'no (DNS-only)'}</dd>
-                                    </div>
-                                    <div>
-                                        <dt class="text-xs text-[var(--color-muted)]">Modo SSL</dt>
-                                        <dd>{domain.sslMode ?? '—'}</dd>
-                                    </div>
-                                    <div>
-                                        <dt class="text-xs text-[var(--color-muted)]">Certificado (id NPM)</dt>
-                                        <dd>{domain.certificateId ?? 'nuevo (Let’s Encrypt)'}</dd>
-                                    </div>
-                                </dl>
-                            ) : (
-                                <p class="text-sm text-[var(--color-muted)]">
-                                    Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM) y el SSL usa el
-                                    certificado wildcard existente *.negri.es (DNS-01).
-                                </p>
-                            )}
-                        </section>
-
-                        <section
-                            class="rounded-[var(--radius-card)] border p-4"
-                            style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                        >
-                            <h2 class="mb-3 text-sm font-semibold">Referencias</h2>
-                            <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">NPM proxy id</dt>
-                                    <dd class="font-mono text-xs">{domain.npmProxyId ?? '—'}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Cloudflare record id</dt>
-                                    <dd class="font-mono text-xs">{domain.cloudflareRecordId ?? '—'}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Mikrotik DNS id</dt>
-                                    <dd class="font-mono text-xs">{domain.mikrotikDnsId ?? '—'}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Creado</dt>
-                                    <dd class="text-xs">{fmtDate(domain.createdAt)}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-xs text-[var(--color-muted)]">Actualizado</dt>
-                                    <dd class="text-xs">{fmtDate(domain.updatedAt)}</dd>
-                                </div>
-                            </dl>
-                        </section>
-                    </div>
-                )
-            }
-        </div>
+                </div>
+            )
+        }
     </body>
 </html>

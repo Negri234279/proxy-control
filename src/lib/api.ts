@@ -1,6 +1,7 @@
 import type {
     CfRecordType,
     CustomLocation,
+    DomainDetailResponse,
     DomainDiffView,
     DomainListItem,
     DomainStatusItem,
@@ -87,6 +88,7 @@ export const api = {
     listDomains: () => req<{ domains: DomainListItem[] }>('/api/domains').then((r) => r.domains),
     status: () => req<{ status: DomainStatusItem[] }>('/api/status').then((r) => r.status),
     domainStatus: (id: string) => req<{ status: DomainDiffView }>(`/api/domains/${id}/status`).then((r) => r.status),
+    domainDetail: (id: string) => req<DomainDetailResponse>(`/api/domains/${id}`),
     createDomain: (body: CreateDomainBody) =>
         req<{ domain: DomainRecord }>('/api/domains', { method: 'POST', body: JSON.stringify(body) }).then(
             (r) => r.domain,

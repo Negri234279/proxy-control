@@ -1,4 +1,3 @@
-import { navigate } from 'astro:transitions/client'
 import { useState } from 'preact/hooks'
 import { useCreateDomain } from '../hooks/useCreateDomain'
 import { useDeleteDomain } from '../hooks/useDeleteDomain'
@@ -10,28 +9,27 @@ import { DomainFormModal } from './DomainFormModal'
 import { Spinner } from './Spinner'
 import { ToastRegion } from './ToastRegion'
 
-// Barra de acciones de la página de detalle: reutiliza el mismo formulario de edición,
-// el diálogo de borrado y los toasts que la tabla. Tras una mutación exitosa RE-RENDERIZA
-// la página con una navegación soft de Astro (fetch + swap del DOM, sin recarga dura): datos
-// frescos del SSR sin flash. Los errores se muestran como toast (no navega, así persisten).
+interface Props {
+    row: DomainListItem
+    // Refresca los datos del detalle EN SITIO (sin navegar). Se llama tras editar/reconciliar/toggle.
+    onMutated: () => Promise<void>
+    // Tras borrar el dominio ya no hay página que mostrar: el contenedor decide a dónde ir.
+    onDeleted: () => void
+}
+
 const btnBase =
     'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none'
 
-export function DomainDetailActions({ row }: { row: DomainListItem }) {
+// Barra de acciones de la página de detalle. Reutiliza el formulario de edición, el diálogo
+// de borrado y los toasts de la tabla; tras cada mutación refresca los datos EN SITIO (sin
+// recargar ni navegar), así los toasts de éxito persisten.
+export function DomainDetailActions({ row, onMutated, onDeleted }: Props) {
     const { toasts, push, dismiss } = useToasts()
     const [reconciling, setReconciling] = useState(false)
     const [toggling, setToggling] = useState(false)
 
-    // Refresca la propia página (mismo id) con navegación soft: re-pide el SSR y hace swap.
-    const refresh = async () => {
-        await navigate(window.location.pathname + window.location.search)
-    }
-    const goHome = async () => {
-        await navigate('/')
-    }
-
-    const create = useCreateDomain({ refetch: refresh, pushToast: push })
-    const del = useDeleteDomain({ refetch: goHome, pushToast: push })
+    const create = useCreateDomain({ refetch: onMutated, pushToast: push })
+    const del = useDeleteDomain({ refetch: async () => onDeleted(), pushToast: push })
 
     const busy = reconciling || toggling || create.submitting || del.submitting
     const canToggle = Boolean(row.npmProxyId)
@@ -42,10 +40,14 @@ export function DomainDetailActions({ row }: { row: DomainListItem }) {
         setReconciling(true)
 
         try {
-            await api.reconcileOne(row.id)
-            await refresh()
+            const domain = await api.reconcileOne(row.id)
+
+            await onMutated()
+
+            push(domain.reconcileState === 'synced' ? 'success' : 'info', `${row.hostname}: ${domain.reconcileState}`)
         } catch (error) {
             push('error', `Reconciliar falló: ${(error as ApiError).message}`)
+        } finally {
             setReconciling(false)
         }
     }
@@ -58,9 +60,12 @@ export function DomainDetailActions({ row }: { row: DomainListItem }) {
 
         try {
             await api.setEnabled(row.npmProxyId, next)
-            await refresh()
+            await onMutated()
+            
+            push('success', `${row.hostname} ${next ? 'habilitado' : 'deshabilitado'}`)
         } catch (error) {
             push('error', `No se pudo ${next ? 'habilitar' : 'deshabilitar'}: ${(error as ApiError).message}`)
+        } finally {
             setToggling(false)
         }
     }
