@@ -8,11 +8,15 @@ const usePolling = process.env.USE_POLLING === 'true'
 
 // https://astro.build/config
 export default defineConfig({
+    site: 'https://proxy-control.negri.es',
+    security: {
+        allowedDomains: [{ hostname: 'proxy-control.negri.es' }],
+    },
     integrations: [preact()],
     vite: {
         plugins: [tailwindcss()],
         server: {
-            allowedHosts: ['proxy-control'],
+            allowedHosts: ['proxy-control', ''],
             watch: usePolling ? { usePolling: true, interval: 300 } : undefined,
         },
     },
