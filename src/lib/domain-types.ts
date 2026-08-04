@@ -65,6 +65,8 @@ export interface DomainListItem {
     cfRecordType: CfRecordType | null
     cfContent: string | null
     cfProxied: boolean
+    cfZoneId: string | null
+    cfZoneName: string | null
 }
 
 // Snapshot de estado para el polling (chequeo en vivo).
@@ -121,6 +123,8 @@ export interface DomainDetailView {
     cfRecordType: CfRecordType
     cfContent: string | null
     cfProxied: boolean
+    cfZoneId: string | null
+    cfZoneName: string | null
     npmProxyId: number | null
     cloudflareRecordId: string | null
     mikrotikDnsId: string | null

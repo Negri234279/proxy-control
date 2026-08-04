@@ -42,6 +42,8 @@ function toListItem(domain: DomainDetailView, enabledInNpm: boolean): DomainList
         cfRecordType: domain.cfRecordType,
         cfContent: domain.cfContent,
         cfProxied: domain.cfProxied,
+        cfZoneId: domain.cfZoneId,
+        cfZoneName: domain.cfZoneName,
     }
 }
 
@@ -206,6 +208,9 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                                 <span class="font-mono text-xs">
                                     {domain.cfRecordType} → {domain.cfContent ?? `(PUBLIC_IP: ${publicIp ?? '—'})`}
                                 </span>
+                            </Field>
+                            <Field label="Zona Cloudflare">
+                                {domain.cfZoneName ?? domain.cfZoneId ?? '(por defecto del proveedor)'}
                             </Field>
                             <Field label="Proxied">{domain.cfProxied ? 'sí (naranja)' : 'no (DNS-only)'}</Field>
                             <Field label="Modo SSL">{domain.sslMode ?? '—'}</Field>

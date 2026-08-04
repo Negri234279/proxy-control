@@ -1,6 +1,7 @@
 import { useRef } from 'preact/hooks'
 import type { useCreateDomain } from '../hooks/useCreateDomain'
 import { useNpmCertificates } from '../hooks/useNpmCertificates'
+import { useZoneSelector } from '../hooks/useZoneSelector'
 import { FORM_TABS, tabHasError, type FormTab } from '../lib/domain-form-tabs'
 import type { CfRecordType, ForwardScheme } from '../lib/domain-types'
 import { NPM_OPTION_LABELS } from '../lib/npm-options'
@@ -20,9 +21,8 @@ const TITLES: Record<CreateDomain['mode'], { title: string; cta: string }> = {
 }
 
 function FieldError({ message }: { message?: string }) {
-    if (!message) {
-        return null
-    }
+    if (!message) return null
+
     return (
         <span class="mt-1 block text-xs" style={{ color: 'var(--color-error)' }}>
             ⚠ {message}
@@ -72,6 +72,7 @@ function TabButton({
 
 export function DomainFormModal({ create }: { create: CreateDomain }) {
     const certificates = useNpmCertificates()
+    const zoneSelector = useZoneSelector(create)
     const tablistRef = useRef<HTMLDivElement>(null)
 
     if (!create.isOpen) {
@@ -390,6 +391,38 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                 <fieldset class="rounded-md border p-3" style={inputStyle}>
                                     <legend class="px-1 text-sm font-medium">DNS (Cloudflare)</legend>
                                     <div class="flex flex-col gap-3">
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium">Zona</label>
+                                            {zoneSelector.loading ? (
+                                                <p class="text-xs text-[var(--color-muted)]">Cargando zonas…</p>
+                                            ) : zoneSelector.zones.length === 0 ? (
+                                                <p class="text-xs text-[var(--color-muted)]">
+                                                    No hay zonas. Revisa el token de Cloudflare en{' '}
+                                                    <a href="/settings" class="underline">
+                                                        Ajustes
+                                                    </a>
+                                                    .
+                                                </p>
+                                            ) : (
+                                                <select
+                                                    class={inputClass}
+                                                    style={inputStyle}
+                                                    value={form.cfZoneId}
+                                                    onChange={(event) => {
+                                                        const id = (event.target as HTMLSelectElement).value
+                                                        const zone = zoneSelector.zones.find((z) => z.id === id)
+                                                        create.setZone(id, zone?.name ?? '')
+                                                    }}
+                                                >
+                                                    <option value="">— elige zona —</option>
+                                                    {zoneSelector.zones.map((zone) => (
+                                                        <option key={zone.id} value={zone.id}>
+                                                            {zone.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
                                         <div class="flex gap-4 text-sm">
                                             {(['A', 'CNAME'] as const).map((value) => (
                                                 <label key={value} class="flex items-center gap-2">

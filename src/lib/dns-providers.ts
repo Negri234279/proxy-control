@@ -95,3 +95,23 @@ export const SCOPE_LABEL: Record<DnsProviderScope, string> = {
     public: 'DNS público',
     private: 'DNS privado',
 }
+
+// Zona de Cloudflare (para el selector del formulario de dominio).
+export interface CloudflareZone {
+    id: string
+    name: string
+}
+
+// Elige la zona cuyo nombre casa con el hostname (igualdad o sufijo por punto), la más
+// específica (nombre más largo). Sin coincidencia → undefined (no se preselecciona nada).
+export function matchZone(hostname: string, zones: CloudflareZone[]): CloudflareZone | undefined {
+    const host = hostname.trim().toLowerCase().replace(/\.$/, '')
+    if (!host) return undefined
+
+    return zones
+        .filter((zone) => {
+            const name = zone.name.toLowerCase()
+            return host === name || host.endsWith(`.${name}`)
+        })
+        .sort((a, b) => b.name.length - a.name.length)[0]
+}

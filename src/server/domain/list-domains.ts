@@ -38,6 +38,8 @@ export async function listDomains(): Promise<DomainListItem[]> {
             cfRecordType: row.cfRecordType,
             cfContent: row.cfContent,
             cfProxied: row.cfProxied,
+            cfZoneId: row.cfZoneId,
+            cfZoneName: row.cfZoneName,
         })
 
         seen.add(row.hostname)
@@ -68,6 +70,8 @@ export async function listDomains(): Promise<DomainListItem[]> {
                 cfRecordType: null,
                 cfContent: null,
                 cfProxied: true,
+                cfZoneId: null,
+                cfZoneName: null,
             })
         }
     }

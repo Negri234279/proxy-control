@@ -45,6 +45,8 @@ const createSchema = z
         cfRecordType: z.enum(['A', 'CNAME']).optional(),
         cfContent: z.string().min(1).optional(),
         cfProxied: z.boolean().optional(),
+        cfZoneId: z.string().min(1).optional(),
+        cfZoneName: z.string().min(1).optional(),
     })
     .superRefine((value, ctx) => {
         // Un registro A público debe apuntar a una IPv4 válida (o dejarse a PUBLIC_IP).
@@ -71,6 +73,8 @@ const updateSchema = z
         cfRecordType: z.enum(['A', 'CNAME']).optional(),
         cfContent: z.string().min(1).nullable().optional(),
         cfProxied: z.boolean().optional(),
+        cfZoneId: z.string().min(1).nullable().optional(),
+        cfZoneName: z.string().min(1).nullable().optional(),
     })
     .strict()
 

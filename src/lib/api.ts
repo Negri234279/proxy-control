@@ -1,4 +1,4 @@
-import type { DnsProviderView } from './dns-providers'
+import type { CloudflareZone, DnsProviderView } from './dns-providers'
 import type {
     CfRecordType,
     CustomLocation,
@@ -66,6 +66,8 @@ export interface CreateDomainBody {
     cfRecordType?: CfRecordType
     cfContent?: string
     cfProxied?: boolean
+    cfZoneId?: string
+    cfZoneName?: string
 }
 
 export interface UpdateDomainBody {
@@ -80,6 +82,8 @@ export interface UpdateDomainBody {
     cfRecordType?: CfRecordType
     cfContent?: string | null
     cfProxied?: boolean
+    cfZoneId?: string | null
+    cfZoneName?: string | null
 }
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
@@ -141,4 +145,5 @@ export const api = {
     deleteDnsProvider: (id: string) => req<{ ok: boolean }>(`/api/settings/dns-providers/${id}`, { method: 'DELETE' }),
     testDnsProvider: (id: string) =>
         req<{ ok: boolean; detail: string }>(`/api/settings/dns-providers/${id}/test`, { method: 'POST' }),
+    cloudflareZones: () => req<{ zones: CloudflareZone[] }>('/api/cloudflare/zones').then((r) => r.zones),
 }

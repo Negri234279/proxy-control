@@ -24,6 +24,8 @@ export interface UpdateDomainInput {
     cfRecordType?: CfRecordType
     cfContent?: string | null
     cfProxied?: boolean
+    cfZoneId?: string | null
+    cfZoneName?: string | null
 }
 
 // Cambio de tipo: borra el DNS del proveedor antiguo (Cloudflare/Mikrotik), reajusta el
@@ -38,7 +40,7 @@ async function switchVisibility(current: Domain, patch: UpdateDomainInput): Prom
             .then((api) => deleteRecord(api, recordId))
             .catch(() => undefined)
     }
-    
+
     if (current.visibility === 'private' && current.mikrotikDnsId) {
         const dnsId = current.mikrotikDnsId
         await resolveMikrotik()
@@ -59,6 +61,8 @@ async function switchVisibility(current: Domain, patch: UpdateDomainInput): Prom
             certificateId: isPublic ? (patch.certificateId ?? null) : null,
             sslMode: isPublic ? 'new' : 'wildcard',
             cfContent: isPublic ? (patch.cfContent ?? current.cfContent ?? defaultPublicIp ?? null) : null,
+            cfZoneId: isPublic ? (patch.cfZoneId ?? current.cfZoneId ?? null) : null,
+            cfZoneName: isPublic ? (patch.cfZoneName ?? current.cfZoneName ?? null) : null,
             reconcileState: 'missing',
         })
         .where(eq(domains.id, current.id))

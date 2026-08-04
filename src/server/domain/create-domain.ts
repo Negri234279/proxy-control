@@ -28,6 +28,8 @@ export interface CreateDomainInput {
     cfRecordType?: CfRecordType
     cfContent?: string
     cfProxied?: boolean
+    cfZoneId?: string
+    cfZoneName?: string
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -62,6 +64,8 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         cfRecordType: input.cfRecordType ?? 'A',
         cfContent: isPublic ? (input.cfContent ?? defaultPublicIp ?? null) : null,
         cfProxied: input.cfProxied ?? true,
+        cfZoneId: isPublic ? (input.cfZoneId ?? null) : null,
+        cfZoneName: isPublic ? (input.cfZoneName ?? null) : null,
         reconcileState: 'missing',
     }
 

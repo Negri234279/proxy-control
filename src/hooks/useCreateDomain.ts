@@ -27,6 +27,8 @@ export interface DomainForm {
     cfRecordType: CfRecordType
     cfContent: string
     cfProxied: boolean
+    cfZoneId: string
+    cfZoneName: string
 }
 
 const emptyForm = (): DomainForm => ({
@@ -42,6 +44,8 @@ const emptyForm = (): DomainForm => ({
     cfRecordType: 'A',
     cfContent: '',
     cfProxied: true,
+    cfZoneId: '',
+    cfZoneName: '',
 })
 
 const emptyLocation = (): CustomLocation => ({
@@ -107,6 +111,8 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             cfRecordType: row.cfRecordType ?? 'A',
             cfContent: row.cfContent ?? '',
             cfProxied: row.cfProxied,
+            cfZoneId: row.cfZoneId ?? '',
+            cfZoneName: row.cfZoneName ?? '',
         })
         setFieldErrors({})
         setActiveTab('detalles')
@@ -125,6 +131,10 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
 
     const setOption = useCallback((key: keyof NpmOptions, value: boolean) => {
         setForm((prev) => ({ ...prev, npmOptions: { ...prev.npmOptions, [key]: value } }))
+    }, [])
+
+    const setZone = useCallback((cfZoneId: string, cfZoneName: string) => {
+        setForm((prev) => ({ ...prev, cfZoneId, cfZoneName }))
     }, [])
 
     const addLocation = useCallback(() => {
@@ -168,6 +178,8 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     body.cfRecordType = form.cfRecordType
                     body.cfContent = form.cfContent || null
                     body.cfProxied = form.cfProxied
+                    body.cfZoneId = form.cfZoneId || null
+                    body.cfZoneName = form.cfZoneName || null
                 }
 
                 await api.updateDomain(editingId, body)
@@ -192,6 +204,13 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     }
                     body.cfProxied = form.cfProxied
                     body.certificateId = form.certificateId === 'new' ? 'new' : Number(form.certificateId)
+                    if (form.cfZoneId) {
+                        body.cfZoneId = form.cfZoneId
+                    }
+                    
+                    if (form.cfZoneName) {
+                        body.cfZoneName = form.cfZoneName
+                    }
                 }
 
                 await api.createDomain(body)
@@ -234,6 +253,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
         close,
         setField,
         setOption,
+        setZone,
         addLocation,
         removeLocation,
         updateLocation,
