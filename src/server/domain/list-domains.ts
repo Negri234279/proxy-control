@@ -1,7 +1,7 @@
 import type { DomainListItem, ForwardScheme } from '../../lib/domain-types'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
-import { listProxyHosts } from '../providers/npm'
+import { isProxyHostEnabled, listProxyHosts } from '../providers/npm'
 import { computeFleetState } from '../reconcile/diff'
 
 // Vista de la tabla: cruza los dominios de NPM con la metadata de la DB, comprobando EN
@@ -30,7 +30,7 @@ export async function listDomains(): Promise<DomainListItem[]> {
             npmState: live?.npm ?? null,
             dnsState: live?.dns ?? null,
             npmProxyId: host?.id ?? row.npmProxyId,
-            enabledInNpm: host ? host.enabled === true || host.enabled === 1 : false,
+            enabledInNpm: host ? isProxyHostEnabled(host) : false,
             npmOptions: row.npmOptions,
             customLocations: row.customLocations,
             advancedConfig: row.advancedConfig,
@@ -60,7 +60,7 @@ export async function listDomains(): Promise<DomainListItem[]> {
                 npmState: null,
                 dnsState: null,
                 npmProxyId: host.id,
-                enabledInNpm: host.enabled === true || host.enabled === 1,
+                enabledInNpm: isProxyHostEnabled(host),
                 npmOptions: null,
                 customLocations: [],
                 advancedConfig: '',

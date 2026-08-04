@@ -1,5 +1,7 @@
 import type { DomainDiffView, DomainListItem, ProviderCheckView } from '../lib/domain-types'
 import { dnsProviderLabel, stateMeta, type RowState } from '../lib/reconcile-state'
+import { ActiveIndicator } from './ActiveIndicator'
+import { RowActionsMenu } from './RowActionsMenu'
 import { Spinner } from './Spinner'
 import { StatusBadge } from './StatusBadge'
 import { VisibilityPill } from './VisibilityPill'
@@ -10,7 +12,9 @@ interface Props {
     expanded: boolean
     detail?: DomainDiffView
     detailLoading: boolean
+    toggling: boolean
     onToggleDetail: (id: string) => void
+    onToggleEnabled: (npmProxyId: number, hostname: string, enabled: boolean) => void
     onReconcile: (id: string, hostname: string) => void
     onEdit: (row: DomainListItem) => void
     onDelete: (row: DomainListItem) => void
@@ -22,31 +26,6 @@ function upstreamText(row: DomainListItem): string {
         return '—'
     }
     return `${row.forwardScheme ?? 'http'}://${row.forwardHost}:${row.forwardPort ?? ''}`
-}
-
-function IconButton({
-    label,
-    glyph,
-    onClick,
-    disabled,
-}: {
-    label: string
-    glyph: string
-    onClick: () => void
-    disabled?: boolean
-}) {
-    return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            onClick={onClick}
-            disabled={disabled}
-            class="rounded-md px-2 py-1 text-sm transition-colors hover:bg-[var(--color-surface-2)] disabled:opacity-40"
-        >
-            {glyph}
-        </button>
-    )
 }
 
 // Detalle de un proveedor en el desplegable: presencia y, si hay drift, las causas
@@ -119,6 +98,13 @@ export function DomainRow(props: Props) {
                         <StatusBadge state={dnsState} provider={provider} />
                     )}
                 </td>
+                <td class="px-3 py-3">
+                    <ActiveIndicator
+                        present={!isUnclassified && Boolean(row.npmProxyId)}
+                        enabled={row.enabledInNpm}
+                        pending={props.toggling}
+                    />
+                </td>
                 <td class="py-3 pr-4 pl-3">
                     <div class="flex items-center justify-end gap-1">
                         {isUnclassified ? (
@@ -131,29 +117,19 @@ export function DomainRow(props: Props) {
                                 Clasificar
                             </button>
                         ) : (
-                            <>
-                                {reconciling ? (
-                                    <Spinner />
-                                ) : (
-                                    <IconButton
-                                        label={`Reconciliar ${row.hostname}`}
-                                        glyph="↻"
-                                        onClick={() => props.onReconcile(row.id as string, row.hostname)}
-                                    />
-                                )}
-                                <IconButton
-                                    label={`Editar ${row.hostname}`}
-                                    glyph="✎"
-                                    onClick={() => props.onEdit(row)}
-                                    disabled={reconciling}
-                                />
-                                <IconButton
-                                    label={`Eliminar ${row.hostname}`}
-                                    glyph="🗑"
-                                    onClick={() => props.onDelete(row)}
-                                    disabled={reconciling}
-                                />
-                            </>
+                            <RowActionsMenu
+                                hostname={row.hostname}
+                                present={Boolean(row.npmProxyId)}
+                                enabled={row.enabledInNpm}
+                                reconciling={reconciling}
+                                pending={props.toggling}
+                                onReconcile={() => props.onReconcile(row.id as string, row.hostname)}
+                                onEdit={() => props.onEdit(row)}
+                                onToggleEnabled={(next) =>
+                                    props.onToggleEnabled(row.npmProxyId as number, row.hostname, next)
+                                }
+                                onDelete={() => props.onDelete(row)}
+                            />
                         )}
                     </div>
                 </td>
@@ -161,7 +137,7 @@ export function DomainRow(props: Props) {
 
             {expanded && canExpand ? (
                 <tr style={{ backgroundColor: 'var(--color-surface-2)' }}>
-                    <td colSpan={6} class="px-4 py-3 text-xs text-[var(--color-muted)]">
+                    <td colSpan={7} class="px-4 py-3 text-xs text-[var(--color-muted)]">
                         {detailLoading ? (
                             <span class="inline-flex items-center gap-2">
                                 <Spinner size={12} /> Comprobando estado en vivo…

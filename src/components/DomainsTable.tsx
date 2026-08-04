@@ -15,6 +15,8 @@ interface Props {
     rows: DomainListItem[]
     reconcilingIds: Set<string>
     domainStatus: DomainStatusView
+    togglingIds: Set<number>
+    onToggleEnabled: (npmProxyId: number, hostname: string, enabled: boolean) => void
     onReconcile: (id: string, hostname: string) => void
     onEdit: (row: DomainListItem) => void
     onDelete: (row: DomainListItem) => void
@@ -23,7 +25,7 @@ interface Props {
     onAdd: () => void
 }
 
-const COLUMNS = ['Hostname', 'Upstream', 'Visibilidad', 'NPM', 'DNS', '']
+const COLUMNS = ['Hostname', 'Upstream', 'Visibilidad', 'NPM', 'DNS', 'Activo', '']
 
 function SkeletonRows() {
     return (
@@ -44,7 +46,7 @@ function SkeletonRows() {
 function MessageRow({ children }: { children: ComponentChildren }) {
     return (
         <tr>
-            <td colSpan={6} class="px-4 py-16 text-center">
+            <td colSpan={7} class="px-4 py-16 text-center">
                 <div class="mx-auto flex max-w-sm flex-col items-center gap-3 text-[var(--color-muted)]">
                     {children}
                 </div>
@@ -122,6 +124,8 @@ export function DomainsTable(props: Props) {
                                   detail={row.id ? props.domainStatus.detailById[row.id] : undefined}
                                   detailLoading={props.domainStatus.loadingId === row.id}
                                   onToggleDetail={props.domainStatus.toggle}
+                                  toggling={Boolean(row.npmProxyId && props.togglingIds.has(row.npmProxyId))}
+                                  onToggleEnabled={props.onToggleEnabled}
                                   onReconcile={props.onReconcile}
                                   onEdit={props.onEdit}
                                   onDelete={props.onDelete}

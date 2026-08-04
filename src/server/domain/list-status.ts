@@ -1,7 +1,7 @@
 import type { DomainStatusItem } from '../../lib/domain-types'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
-import { listProxyHosts } from '../providers/npm'
+import { isProxyHostEnabled, listProxyHosts } from '../providers/npm'
 import { computeFleetState } from '../reconcile/diff'
 
 // Estado de sync de la flota para el POLLING de la tabla. Comprueba EN VIVO cada dominio
@@ -17,6 +17,7 @@ export async function listStatus(): Promise<DomainStatusItem[]> {
 
     return rows.map((row) => {
         const live = liveState.get(row.id)
+        const host = hosts.find((candidate) => candidate.domain_names.includes(row.hostname))
 
         return {
             id: row.id,
@@ -25,6 +26,7 @@ export async function listStatus(): Promise<DomainStatusItem[]> {
             reconcileState: live?.state ?? row.reconcileState,
             npmState: live?.npm ?? row.reconcileState,
             dnsState: live?.dns ?? row.reconcileState,
+            enabledInNpm: host ? isProxyHostEnabled(host) : false,
             lastReconciledAt: row.lastReconciledAt?.toISOString() ?? null,
         }
     })

@@ -103,4 +103,9 @@ export const api = {
         req<{ results: ReconcileResultItem[] }>('/api/reconcile', { method: 'POST' }).then((r) => r.results),
     certificates: () =>
         req<{ certificates: NpmCertificateOption[] }>('/api/npm/certificates').then((r) => r.certificates),
+    setEnabled: (npmProxyId: number, enabled: boolean) =>
+        req<{ enabled: boolean }>(`/api/npm/proxy-hosts/${npmProxyId}/enabled`, {
+            method: 'POST',
+            body: JSON.stringify({ enabled }),
+        }).then((r) => r.enabled),
 }

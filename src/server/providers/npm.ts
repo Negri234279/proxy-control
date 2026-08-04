@@ -158,3 +158,14 @@ export function updateProxyHost(id: number, input: CreateProxyHostInput): Promis
 export function deleteProxyHost(id: number): Promise<boolean> {
     return authedJson<boolean>(`/api/nginx/proxy-hosts/${id}`, { method: 'DELETE' })
 }
+
+// Habilita/deshabilita el proxy host (mismo botón que la UI de NPM). Endpoints dedicados.
+export function setProxyHostEnabled(id: number, enabled: boolean): Promise<boolean> {
+    const action = enabled ? 'enable' : 'disable'
+    return authedJson<boolean>(`/api/nginx/proxy-hosts/${id}/${action}`, { method: 'POST' })
+}
+
+// NPM devuelve `enabled` como boolean (v2.15) o 0/1: normaliza a boolean.
+export function isProxyHostEnabled(host: NpmProxyHost): boolean {
+    return host.enabled === true || host.enabled === 1
+}

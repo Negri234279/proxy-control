@@ -75,6 +75,7 @@ export interface DomainStatusItem {
     reconcileState: ReconcileState
     npmState: ReconcileState
     dnsState: ReconcileState
+    enabledInNpm: boolean
     lastReconciledAt: string | null
 }
 

@@ -38,6 +38,7 @@ export function useDomains() {
                     reconcileState: status.reconcileState,
                     npmState: status.npmState,
                     dnsState: status.dnsState,
+                    enabledInNpm: status.enabledInNpm,
                 }
             }),
         )
@@ -47,11 +48,20 @@ export function useDomains() {
         setDomains((prev) => prev.map((domain) => (domain.id === id ? { ...domain, ...patch } : domain)))
     }, [])
 
+    // Parchea TODAS las filas de un mismo proxy host (un host puede servir varios hostnames,
+    // y el enable/disable afecta a todas). Se usa para el toggle de habilitar/deshabilitar.
+    const patchByNpmId = useCallback((npmProxyId: number, patch: Partial<DomainListItem>) => {
+        setDomains((prev) =>
+            prev.map((domain) => (domain.npmProxyId === npmProxyId ? { ...domain, ...patch } : domain)),
+        )
+    }, [])
+
     return {
         status,
         domains,
         refetch,
         applyStatusSnapshot,
         patchRow,
+        patchByNpmId,
     }
 }
