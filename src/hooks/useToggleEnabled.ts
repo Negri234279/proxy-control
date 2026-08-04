@@ -8,11 +8,14 @@ interface ToggleDeps {
     pushToast: (kind: ToastKind, message: string) => void
 }
 
-// Habilita/deshabilita el proxy host en NPM (mismo botón que la UI de NPM). Optimista:
-// actualiza la fila al instante y revierte si la API falla. `togglingIds` marca los que
-// están en vuelo (por id de proxy host) para bloquear el control mientras tanto.
+// Habilita/deshabilita el proxy host en NPM (mismo botón que la UI de NPM), con
+// confirmación previa (deshabilitar deja el servicio inaccesible). Optimista: actualiza la
+// fila al instante y revierte si la API falla. `togglingIds` marca los que están en vuelo
+// (por id de proxy host) para bloquear el control mientras tanto.
 export function useToggleEnabled({ patchByNpmId, pushToast }: ToggleDeps) {
     const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set())
+    const [pending, setPending] = useState<DomainListItem | null>(null)
+    const [submitting, setSubmitting] = useState(false)
 
     const mark = useCallback((id: number, on: boolean) => {
         setTogglingIds((prev) => {
@@ -45,8 +48,38 @@ export function useToggleEnabled({ patchByNpmId, pushToast }: ToggleDeps) {
         [mark, patchByNpmId, pushToast],
     )
 
+    // Abre la confirmación para la fila; el destino se deriva de su estado al confirmar.
+    const request = useCallback((row: DomainListItem) => {
+        setPending(row)
+    }, [])
+
+    const close = useCallback(() => {
+        setPending(null)
+    }, [])
+
+    const confirm = useCallback(async () => {
+        const row = pending
+
+        if (!row?.npmProxyId) {
+            return
+        }
+
+        setSubmitting(true)
+
+        try {
+            await toggle(row.npmProxyId, row.hostname, !row.enabledInNpm)
+            setPending(null)
+        } finally {
+            setSubmitting(false)
+        }
+    }, [pending, toggle])
+
     return {
         togglingIds,
-        toggle,
+        pending,
+        submitting,
+        request,
+        confirm,
+        close,
     }
 }

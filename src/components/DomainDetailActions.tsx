@@ -8,6 +8,7 @@ import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DomainFormModal } from './DomainFormModal'
 import { Spinner } from './Spinner'
 import { ToastRegion } from './ToastRegion'
+import { ToggleEnabledConfirmDialog } from './ToggleEnabledConfirmDialog'
 
 interface Props {
     row: DomainListItem
@@ -27,6 +28,7 @@ export function DomainDetailActions({ row, onMutated, onDeleted }: Props) {
     const { toasts, push, dismiss } = useToasts()
     const [reconciling, setReconciling] = useState(false)
     const [toggling, setToggling] = useState(false)
+    const [confirmingToggle, setConfirmingToggle] = useState(false)
 
     const create = useCreateDomain({ refetch: onMutated, pushToast: push })
     const del = useDeleteDomain({ refetch: async () => onDeleted(), pushToast: push })
@@ -61,8 +63,9 @@ export function DomainDetailActions({ row, onMutated, onDeleted }: Props) {
         try {
             await api.setEnabled(row.npmProxyId, next)
             await onMutated()
-            
+
             push('success', `${row.hostname} ${next ? 'habilitado' : 'deshabilitado'}`)
+            setConfirmingToggle(false)
         } catch (error) {
             push('error', `No se pudo ${next ? 'habilitar' : 'deshabilitar'}: ${(error as ApiError).message}`)
         } finally {
@@ -95,7 +98,7 @@ export function DomainDetailActions({ row, onMutated, onDeleted }: Props) {
             {canToggle ? (
                 <button
                     type="button"
-                    onClick={toggleEnabled}
+                    onClick={() => setConfirmingToggle(true)}
                     disabled={busy}
                     class={`${btnBase} border hover:bg-[var(--color-surface-2)]`}
                     style={{ borderColor: 'var(--color-border)' }}
@@ -122,6 +125,12 @@ export function DomainDetailActions({ row, onMutated, onDeleted }: Props) {
                 submitting={del.submitting}
                 onConfirm={del.confirm}
                 onClose={del.close}
+            />
+            <ToggleEnabledConfirmDialog
+                row={confirmingToggle ? row : null}
+                submitting={toggling}
+                onConfirm={toggleEnabled}
+                onClose={() => setConfirmingToggle(false)}
             />
             <ToastRegion toasts={toasts} onDismiss={dismiss} />
         </div>

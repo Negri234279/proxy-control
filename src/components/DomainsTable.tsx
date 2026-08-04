@@ -16,7 +16,7 @@ interface Props {
     reconcilingIds: Set<string>
     domainStatus: DomainStatusView
     togglingIds: Set<number>
-    onToggleEnabled: (npmProxyId: number, hostname: string, enabled: boolean) => void
+    onToggleEnabled: (row: DomainListItem) => void
     onReconcile: (id: string, hostname: string) => void
     onEdit: (row: DomainListItem) => void
     onDelete: (row: DomainListItem) => void

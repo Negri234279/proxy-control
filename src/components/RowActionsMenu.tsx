@@ -11,7 +11,7 @@ interface Props {
     pending: boolean // habilitar/deshabilitar en vuelo
     onReconcile: () => void
     onEdit: () => void
-    onToggleEnabled: (next: boolean) => void
+    onToggleEnabled: () => void
     onDelete: () => void
 }
 
@@ -124,7 +124,7 @@ export function RowActionsMenu(props: Props) {
                                   glyph="⏻"
                                   label={props.enabled ? 'Deshabilitar' : 'Habilitar'}
                                   disabled={busy}
-                                  onClick={() => run(() => props.onToggleEnabled(!props.enabled))}
+                                  onClick={() => run(props.onToggleEnabled)}
                               />
                           ) : null}
                           <div role="separator" class="my-1 border-t" style={{ borderColor: 'var(--color-border)' }} />

@@ -14,6 +14,7 @@ import { DomainFormModal } from './DomainFormModal'
 import { DomainsTable } from './DomainsTable'
 import { DomainsToolbar } from './DomainsToolbar'
 import { ToastRegion } from './ToastRegion'
+import { ToggleEnabledConfirmDialog } from './ToggleEnabledConfirmDialog'
 
 // Isla raíz: compone los hooks (toda la lógica de estado) y los componentes.
 export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
@@ -55,7 +56,7 @@ export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
                 reconcilingIds={reconcile.reconcilingIds}
                 domainStatus={domainStatus}
                 togglingIds={toggleEnabled.togglingIds}
-                onToggleEnabled={toggleEnabled.toggle}
+                onToggleEnabled={toggleEnabled.request}
                 onReconcile={reconcile.reconcileOne}
                 onEdit={create.openEdit}
                 onDelete={del.open}
@@ -73,6 +74,13 @@ export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
                 submitting={del.submitting}
                 onConfirm={del.confirm}
                 onClose={del.close}
+            />
+
+            <ToggleEnabledConfirmDialog
+                row={toggleEnabled.pending}
+                submitting={toggleEnabled.submitting}
+                onConfirm={toggleEnabled.confirm}
+                onClose={toggleEnabled.close}
             />
 
             <ToastRegion toasts={toasts} onDismiss={dismiss} />

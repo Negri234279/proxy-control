@@ -14,7 +14,7 @@ interface Props {
     detailLoading: boolean
     toggling: boolean
     onToggleDetail: (id: string) => void
-    onToggleEnabled: (npmProxyId: number, hostname: string, enabled: boolean) => void
+    onToggleEnabled: (row: DomainListItem) => void
     onReconcile: (id: string, hostname: string) => void
     onEdit: (row: DomainListItem) => void
     onDelete: (row: DomainListItem) => void
@@ -126,9 +126,7 @@ export function DomainRow(props: Props) {
                                 pending={props.toggling}
                                 onReconcile={() => props.onReconcile(row.id as string, row.hostname)}
                                 onEdit={() => props.onEdit(row)}
-                                onToggleEnabled={(next) =>
-                                    props.onToggleEnabled(row.npmProxyId as number, row.hostname, next)
-                                }
+                                onToggleEnabled={() => props.onToggleEnabled(row)}
                                 onDelete={() => props.onDelete(row)}
                             />
                         )}
