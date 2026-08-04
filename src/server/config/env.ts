@@ -36,25 +36,30 @@ const schema = z
         NPM_EMAIL: z.string().min(1),
         NPM_PASSWORD: z.string().min(1),
 
-        // Cloudflare (dominios públicos).
-        CLOUDFLARE_API_TOKEN: z.string().min(1),
-        CLOUDFLARE_ZONE_ID: z.string().min(1),
+        // Cloudflare / Mikrotik: LEGACY. La config de proveedores DNS vive ahora en la DB
+        // (tabla dns_providers, editable por panel). Si estas vars están presentes se usan
+        // SOLO para el seed inicial (compatibilidad con despliegues previos). Opcionales.
+        CLOUDFLARE_API_TOKEN: z.string().min(1).optional(),
+        CLOUDFLARE_ZONE_ID: z.string().min(1).optional(),
         PUBLIC_IP: z.string().min(1).optional(),
 
-        // Mikrotik (dominios privados, REST RouterOS 7).
-        MIKROTIK_BASE_URL: z.string().min(1),
-        MIKROTIK_USER: z.string().min(1),
-        MIKROTIK_PASSWORD: z.string().min(1),
+        MIKROTIK_BASE_URL: z.string().min(1).optional(),
+        MIKROTIK_USER: z.string().min(1).optional(),
+        MIKROTIK_PASSWORD: z.string().min(1).optional(),
         MIKROTIK_TLS_INSECURE: boolFromEnv(false),
 
-        // IP interna de NPM: destino de las entradas DNS estáticas privadas.
-        NPM_INTERNAL_IP: z.string().min(1),
+        // IP interna de NPM: destino de las entradas DNS estáticas privadas (legacy → seed).
+        NPM_INTERNAL_IP: z.string().min(1).optional(),
 
         // Auth del panel.
         AUTH_ENABLED: boolFromEnv(true),
         AUTH_USER: z.string().min(1).optional(),
         AUTH_PASSWORD_HASH: z.string().min(1).optional(),
         SESSION_SECRET: z.string().min(1),
+
+        // Clave para cifrar los secretos de proveedores DNS en la DB (AES-256-GCM). Se deriva
+        // a 32 bytes con SHA-256, así que admite cualquier passphrase suficientemente larga.
+        SETTINGS_KEY: z.string().min(16),
     })
     .superRefine((value, ctx) => {
         if (!value.AUTH_ENABLED) {

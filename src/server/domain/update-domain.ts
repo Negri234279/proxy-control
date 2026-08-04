@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm'
 import type { CfRecordType, CustomLocation, ForwardScheme, NpmOptions } from '../../lib/domain-types'
-import { env } from '../config/env'
 import { db } from '../db/client'
 import { domains, type Domain } from '../db/schema'
 import { deleteRecord } from '../providers/cloudflare'
 import { deleteStaticDns } from '../providers/mikrotik'
+import { cloudflareApiForDomain, getCloudflareDefaultPublicIp, resolveMikrotik } from '../settings/dns-providers'
 import { getDomainOrThrow } from './get-domain'
 import { reconcileDomain } from './reconcile-domain'
 
@@ -33,11 +33,20 @@ async function switchVisibility(current: Domain, patch: UpdateDomainInput): Prom
 
     // 1) Borrar el proveedor antiguo (best-effort: no bloquea el cambio).
     if (current.visibility === 'public' && current.cloudflareRecordId) {
-        await deleteRecord(current.cloudflareRecordId).catch(() => undefined)
+        const recordId = current.cloudflareRecordId
+        await cloudflareApiForDomain(current)
+            .then((api) => deleteRecord(api, recordId))
+            .catch(() => undefined)
     }
+    
     if (current.visibility === 'private' && current.mikrotikDnsId) {
-        await deleteStaticDns(current.mikrotikDnsId).catch(() => undefined)
+        const dnsId = current.mikrotikDnsId
+        await resolveMikrotik()
+            .then((mk) => deleteStaticDns(mk, dnsId))
+            .catch(() => undefined)
     }
+
+    const defaultPublicIp = isPublic ? await getCloudflareDefaultPublicIp() : null
 
     // 2) Estado deseado nuevo: limpia ids del proveedor antiguo y re-deriva el certificado.
     const [updated] = await db
@@ -49,7 +58,7 @@ async function switchVisibility(current: Domain, patch: UpdateDomainInput): Prom
             mikrotikDnsId: null,
             certificateId: isPublic ? (patch.certificateId ?? null) : null,
             sslMode: isPublic ? 'new' : 'wildcard',
-            cfContent: isPublic ? (patch.cfContent ?? current.cfContent ?? env.PUBLIC_IP ?? null) : null,
+            cfContent: isPublic ? (patch.cfContent ?? current.cfContent ?? defaultPublicIp ?? null) : null,
             reconcileState: 'missing',
         })
         .where(eq(domains.id, current.id))

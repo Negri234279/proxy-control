@@ -4,6 +4,7 @@ import { domains } from '../db/schema'
 import { deleteRecord } from '../providers/cloudflare'
 import { deleteStaticDns } from '../providers/mikrotik'
 import { deleteProxyHost } from '../providers/npm'
+import { cloudflareApiForDomain, resolveMikrotik } from '../settings/dns-providers'
 import { getDomainOrThrow } from './get-domain'
 
 interface DeleteOptions {
@@ -23,10 +24,17 @@ export async function deleteDomain(id: string, options: DeleteOptions = {}): Pro
 
     if (options.removeDns) {
         if (domain.visibility === 'public' && domain.cloudflareRecordId) {
-            await deleteRecord(domain.cloudflareRecordId).catch(() => undefined)
+            const recordId = domain.cloudflareRecordId
+            await cloudflareApiForDomain(domain)
+                .then((api) => deleteRecord(api, recordId))
+                .catch(() => undefined)
         }
+        
         if (domain.visibility === 'private' && domain.mikrotikDnsId) {
-            await deleteStaticDns(domain.mikrotikDnsId).catch(() => undefined)
+            const dnsId = domain.mikrotikDnsId
+            await resolveMikrotik()
+                .then((mk) => deleteStaticDns(mk, dnsId))
+                .catch(() => undefined)
         }
     }
 

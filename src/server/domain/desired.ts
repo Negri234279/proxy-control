@@ -1,5 +1,4 @@
 import { DEFAULT_NPM_OPTIONS } from '../../lib/domain-types'
-import { env } from '../config/env'
 import type { Domain } from '../db/schema'
 import { ValidationError } from '../errors'
 import type { CreateRecordInput } from '../providers/cloudflare'
@@ -15,9 +14,11 @@ export async function desiredCertificateId(domain: Domain): Promise<number | 'ne
     if (domain.certificateId) {
         return domain.certificateId
     }
+
     if (domain.visibility === 'public') {
         return 'new'
     }
+
     return resolveWildcardCertificateId(domain.hostname)
 }
 
@@ -43,21 +44,23 @@ export function desiredProxyHostInput(domain: Domain, certificateId: number | 'n
     }
 }
 
-export function desiredCfContent(domain: Domain): string {
-    const content = domain.cfContent ?? env.PUBLIC_IP
+// `defaultPublicIp` viene del proveedor Cloudflare (config en DB), no del entorno.
+export function desiredCfContent(domain: Domain, defaultPublicIp: string | null): string {
+    const content = domain.cfContent ?? defaultPublicIp
     if (!content) {
         throw new ValidationError('Falta el contenido del registro DNS público', {
             cfContent: 'requerido (IP para A, host para CNAME)',
         })
     }
+    
     return content
 }
 
-export function desiredCfRecord(domain: Domain): CreateRecordInput {
+export function desiredCfRecord(domain: Domain, defaultPublicIp: string | null): CreateRecordInput {
     return {
         name: domain.hostname,
         type: domain.cfRecordType,
-        content: desiredCfContent(domain),
+        content: desiredCfContent(domain, defaultPublicIp),
         proxied: domain.cfProxied,
     }
 }

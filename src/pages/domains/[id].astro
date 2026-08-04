@@ -4,7 +4,7 @@ import { DomainDetail } from '../../components/DomainDetail'
 import { getDomainOrThrow } from '../../server/domain/get-domain'
 import { diff } from '../../server/reconcile/diff'
 import { NotFoundError } from '../../server/errors'
-import { env } from '../../server/config/env'
+import { getCloudflareDefaultPublicIp } from '../../server/settings/dns-providers'
 import type { DomainDetailResponse, DomainDetailView } from '../../lib/domain-types'
 
 const { id } = Astro.params
@@ -44,7 +44,7 @@ try {
     initial = {
         domain: view,
         status,
-        publicIp: env.PUBLIC_IP ?? null,
+        publicIp: await getCloudflareDefaultPublicIp(),
     }
 } catch (error) {
     if (error instanceof NotFoundError) {

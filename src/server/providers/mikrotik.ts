@@ -1,15 +1,18 @@
 import { Buffer } from 'node:buffer'
 import { Agent, request } from 'node:https'
-import { env } from '../config/env'
 import { ProviderError } from '../errors'
 
-// Cliente del Mikrotik (RouterOS 7 REST API sobre www-ssl, 443). Usa node:https en vez
-// de fetch para poder aceptar el certificado self-signed del router (MIKROTIK_TLS_INSECURE).
+// Cliente del Mikrotik (RouterOS 7 REST API sobre www-ssl, 443). Usa node:https en vez de
+// fetch para poder aceptar el certificado self-signed del router (tlsInsecure). Sin estado:
+// recibe la conexión (`MikrotikApi`) por parámetro, resuelta desde el panel/DB.
 // Docs: https://help.mikrotik.com/docs/display/ROS/REST+API
 
-const BASE = env.MIKROTIK_BASE_URL.replace(/\/$/, '') + '/rest'
-const AUTH = 'Basic ' + Buffer.from(`${env.MIKROTIK_USER}:${env.MIKROTIK_PASSWORD}`).toString('base64')
-const agent = new Agent({ rejectUnauthorized: !env.MIKROTIK_TLS_INSECURE })
+export interface MikrotikApi {
+    baseUrl: string
+    user: string
+    password: string
+    tlsInsecure: boolean
+}
 
 export interface MikrotikDnsEntry {
     '.id': string
@@ -23,11 +26,27 @@ export interface CreateStaticDnsInput {
     address: string
 }
 
-function mikrotikRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+// Reutiliza agentes por modo TLS (solo dos posibles) para no crear uno por request.
+const agents = new Map<boolean, Agent>()
+
+function agentFor(tlsInsecure: boolean): Agent {
+    let agent = agents.get(tlsInsecure)
+    if (!agent) {
+        agent = new Agent({ rejectUnauthorized: !tlsInsecure })
+        agents.set(tlsInsecure, agent)
+    }
+    
+    return agent
+}
+
+function mikrotikRequest<T>(api: MikrotikApi, method: string, path: string, body?: unknown): Promise<T> {
+    const base = api.baseUrl.replace(/\/$/, '') + '/rest'
+    const auth = 'Basic ' + Buffer.from(`${api.user}:${api.password}`).toString('base64')
+
     return new Promise((resolve, reject) => {
         const payload = body === undefined ? undefined : JSON.stringify(body)
         const headers: Record<string, string> = {
-            Authorization: AUTH,
+            Authorization: auth,
             Accept: 'application/json',
         }
 
@@ -36,35 +55,39 @@ function mikrotikRequest<T>(method: string, path: string, body?: unknown): Promi
             headers['Content-Length'] = String(Buffer.byteLength(payload))
         }
 
-        const req = request(new URL(BASE + path), { method, agent, headers, timeout: 8000 }, (res) => {
-            const chunks: Buffer[] = []
+        const req = request(
+            new URL(base + path),
+            { method, agent: agentFor(api.tlsInsecure), headers, timeout: 8000 },
+            (res) => {
+                const chunks: Buffer[] = []
 
-            res.on('data', (chunk) => chunks.push(chunk as Buffer))
-            res.on('end', () => {
-                const text = Buffer.concat(chunks).toString('utf8')
-                const status = res.statusCode ?? 0
+                res.on('data', (chunk) => chunks.push(chunk as Buffer))
+                res.on('end', () => {
+                    const text = Buffer.concat(chunks).toString('utf8')
+                    const status = res.statusCode ?? 0
 
-                if (status < 200 || status >= 300) {
-                    reject(
-                        new ProviderError('mikrotik', `Mikrotik respondió ${status}: ${text.slice(0, 300)}`, {
-                            status,
-                        }),
-                    )
-                    return
-                }
+                    if (status < 200 || status >= 300) {
+                        reject(
+                            new ProviderError('mikrotik', `Mikrotik respondió ${status}: ${text.slice(0, 300)}`, {
+                                status,
+                            }),
+                        )
+                        return
+                    }
 
-                if (!text) {
-                    resolve(undefined as T)
-                    return
-                }
+                    if (!text) {
+                        resolve(undefined as T)
+                        return
+                    }
 
-                try {
-                    resolve(JSON.parse(text) as T)
-                } catch (cause) {
-                    reject(new ProviderError('mikrotik', 'Respuesta no-JSON de Mikrotik', { cause }))
-                }
-            })
-        })
+                    try {
+                        resolve(JSON.parse(text) as T)
+                    } catch (cause) {
+                        reject(new ProviderError('mikrotik', 'Respuesta no-JSON de Mikrotik', { cause }))
+                    }
+                })
+            },
+        )
 
         // Sin timeout, un Mikrotik inalcanzable colgaría la carga de la tabla.
         req.on('timeout', () => req.destroy(new Error('timeout tras 8s')))
@@ -81,22 +104,22 @@ function mikrotikRequest<T>(method: string, path: string, body?: unknown): Promi
     })
 }
 
-export function listStaticDns(): Promise<MikrotikDnsEntry[]> {
-    return mikrotikRequest<MikrotikDnsEntry[]>('GET', '/ip/dns/static')
+export function listStaticDns(api: MikrotikApi): Promise<MikrotikDnsEntry[]> {
+    return mikrotikRequest<MikrotikDnsEntry[]>(api, 'GET', '/ip/dns/static')
 }
 
-export function createStaticDns(input: CreateStaticDnsInput): Promise<MikrotikDnsEntry> {
-    return mikrotikRequest<MikrotikDnsEntry>('PUT', '/ip/dns/static', {
+export function createStaticDns(api: MikrotikApi, input: CreateStaticDnsInput): Promise<MikrotikDnsEntry> {
+    return mikrotikRequest<MikrotikDnsEntry>(api, 'PUT', '/ip/dns/static', {
         name: input.name,
         address: input.address,
         type: 'A',
     })
 }
 
-export function updateStaticDns(id: string, address: string): Promise<MikrotikDnsEntry> {
-    return mikrotikRequest<MikrotikDnsEntry>('PATCH', `/ip/dns/static/${encodeURIComponent(id)}`, { address })
+export function updateStaticDns(api: MikrotikApi, id: string, address: string): Promise<MikrotikDnsEntry> {
+    return mikrotikRequest<MikrotikDnsEntry>(api, 'PATCH', `/ip/dns/static/${encodeURIComponent(id)}`, { address })
 }
 
-export function deleteStaticDns(id: string): Promise<void> {
-    return mikrotikRequest<void>('DELETE', `/ip/dns/static/${encodeURIComponent(id)}`)
+export function deleteStaticDns(api: MikrotikApi, id: string): Promise<void> {
+    return mikrotikRequest<void>(api, 'DELETE', `/ip/dns/static/${encodeURIComponent(id)}`)
 }

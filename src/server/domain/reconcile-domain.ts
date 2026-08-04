@@ -1,13 +1,13 @@
 import { eq } from 'drizzle-orm'
 import type { ReconcileResultItem } from '../../lib/domain-types'
-import { env } from '../config/env'
 import { db } from '../db/client'
 import { domains, type Domain, type NewDomain } from '../db/schema'
 import { ValidationError } from '../errors'
-import { createRecord, findRecord, updateRecord } from '../providers/cloudflare'
+import { createRecord, findRecord, updateRecord, type CloudflareApi } from '../providers/cloudflare'
 import { createStaticDns, listStaticDns, updateStaticDns } from '../providers/mikrotik'
 import { reconcileCounter } from '../observability/metrics'
 import { createProxyHost, listProxyHosts, updateProxyHost } from '../providers/npm'
+import { resolveCloudflare, resolveMikrotik } from '../settings/dns-providers'
 import { desiredCertificateId, desiredCfRecord, desiredProxyHostInput } from './desired'
 import { getDomainOrThrow } from './get-domain'
 
@@ -16,12 +16,22 @@ import { getDomainOrThrow } from './get-domain'
 // lo que falte o diverja. Deja `reconcile_state: 'error'` si algo falla.
 
 async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Promise<void> {
-    const desired = desiredCfRecord(domain)
+    const cf = await resolveCloudflare()
+    const zoneId = domain.cfZoneId ?? cf.defaultZoneId
+    if (!zoneId) {
+        throw new ValidationError('Falta la zona de Cloudflare', { cfZoneId: 'requerido (elige una zona)' })
+    }
+
+    const api: CloudflareApi = { token: cf.token, zoneId }
+    const desired = desiredCfRecord(domain, cf.defaultPublicIp)
     // Solo el registro del tipo gestionado (ignora un MX/otros que compartan hostname).
-    const existing = await findRecord(domain.hostname, domain.cfRecordType)
+    const existing = await findRecord(api, domain.hostname, domain.cfRecordType)
+
+    // Deja constancia de la zona usada (si venía del default del proveedor, la fija).
+    updates.cfZoneId = zoneId
 
     if (!existing) {
-        const created = await createRecord(desired)
+        const created = await createRecord(api, desired)
         updates.cloudflareRecordId = created.id
 
         return
@@ -30,24 +40,25 @@ async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Pro
     const drift =
         existing.type !== desired.type || existing.content !== desired.content || existing.proxied !== desired.proxied
     if (drift) {
-        await updateRecord(existing.id, desired)
+        await updateRecord(api, existing.id, desired)
     }
 
     updates.cloudflareRecordId = existing.id
 }
 
 async function ensurePrivateDns(domain: Domain, updates: Partial<NewDomain>): Promise<void> {
-    const entries = await listStaticDns()
+    const mk = await resolveMikrotik()
+    const entries = await listStaticDns(mk)
     const existing = entries.find((entry) => entry.name === domain.hostname)
 
     if (!existing) {
-        const created = await createStaticDns({ name: domain.hostname, address: env.NPM_INTERNAL_IP })
+        const created = await createStaticDns(mk, { name: domain.hostname, address: mk.npmInternalIp })
         updates.mikrotikDnsId = created['.id']
         return
     }
 
-    if (existing.address !== env.NPM_INTERNAL_IP) {
-        await updateStaticDns(existing['.id'], env.NPM_INTERNAL_IP)
+    if (existing.address !== mk.npmInternalIp) {
+        await updateStaticDns(mk, existing['.id'], mk.npmInternalIp)
     }
 
     updates.mikrotikDnsId = existing['.id']
@@ -79,6 +90,7 @@ async function ensureNpm(domain: Domain, updates: Partial<NewDomain>): Promise<v
 
     const updated = await updateProxyHost(existing.id, input)
     updates.npmProxyId = updated.id
+    
     if (updated.certificate_id > 0) {
         updates.certificateId = updated.certificate_id
         // Si el cert se acaba de asignar en este update (venía 'new'), re-aplica los flags SSL.
