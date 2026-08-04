@@ -19,7 +19,17 @@ const cardStyle = { borderColor: 'var(--color-border)', backgroundColor: 'var(--
 const providerState = (check: ProviderCheckView): ReconcileState =>
     !check.present ? 'missing' : check.drift ? 'drift' : 'synced'
 
-const fmtDate = (value: string | null): string => (value ? new Date(value).toLocaleString('es-ES') : '—')
+const fmtDate = (value: string | null): string =>
+    value
+        ? new Date(value).toLocaleString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hourCycle: 'h23',
+          })
+        : '—'
 
 // Convierte el detalle en la fila que consumen el form de edición y el diálogo de borrado.
 function toListItem(domain: DomainDetailView, enabledInNpm: boolean): DomainListItem {
