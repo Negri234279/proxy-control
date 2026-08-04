@@ -119,6 +119,7 @@ export function DomainRow(props: Props) {
                         ) : (
                             <RowActionsMenu
                                 hostname={row.hostname}
+                                detailsHref={`/domains/${row.id}`}
                                 present={Boolean(row.npmProxyId)}
                                 enabled={row.enabledInNpm}
                                 reconciling={reconciling}

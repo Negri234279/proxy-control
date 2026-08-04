@@ -4,6 +4,7 @@ import { Spinner } from './Spinner'
 
 interface Props {
     hostname: string
+    detailsHref: string
     present: boolean // tiene proxy host en NPM → se puede habilitar/deshabilitar
     enabled: boolean
     reconciling: boolean
@@ -14,19 +15,43 @@ interface Props {
     onDelete: () => void
 }
 
+const ITEM_CLASS =
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)] focus:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none focus-visible:ring-inset aria-disabled:opacity-40'
+
+// Un item del menú: enlace (`href`, navega) o botón (`onClick`, acción).
 function MenuItem({
     glyph,
     label,
     onClick,
+    href,
     disabled,
     danger,
 }: {
     glyph: string
     label: string
-    onClick: () => void
+    onClick?: () => void
+    href?: string
     disabled?: boolean
     danger?: boolean
 }) {
+    const style = danger ? { color: 'var(--color-error)' } : undefined
+    const body = (
+        <>
+            <span aria-hidden="true" class="w-4 text-center">
+                {glyph}
+            </span>
+            <span>{label}</span>
+        </>
+    )
+
+    if (href) {
+        return (
+            <a role="menuitem" href={href} tabIndex={-1} class={ITEM_CLASS} style={style}>
+                {body}
+            </a>
+        )
+    }
+
     return (
         <button
             type="button"
@@ -34,13 +59,10 @@ function MenuItem({
             tabIndex={-1}
             aria-disabled={disabled ? 'true' : 'false'}
             onClick={disabled ? undefined : onClick}
-            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)] focus:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none focus-visible:ring-inset aria-disabled:opacity-40"
-            style={danger ? { color: 'var(--color-error)' } : undefined}
+            class={ITEM_CLASS}
+            style={style}
         >
-            <span aria-hidden="true" class="w-4 text-center">
-                {glyph}
-            </span>
-            <span>{label}</span>
+            {body}
         </button>
     )
 }
@@ -94,6 +116,7 @@ export function RowActionsMenu(props: Props) {
                               backgroundColor: 'var(--color-surface)',
                           }}
                       >
+                          <MenuItem glyph="ⓘ" label="Ver detalles" href={props.detailsHref} />
                           <MenuItem glyph="↻" label="Reconciliar" onClick={() => run(props.onReconcile)} />
                           <MenuItem glyph="✎" label="Editar" onClick={() => run(props.onEdit)} />
                           {props.present ? (

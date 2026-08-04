@@ -101,5 +101,6 @@ export interface DomainDiffView {
     state: ReconcileState
     npm: ProviderCheckView
     dns: ProviderCheckView
+    enabledInNpm: boolean
     issues: string[]
 }
