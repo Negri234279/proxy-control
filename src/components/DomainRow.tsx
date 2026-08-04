@@ -76,7 +76,7 @@ export function DomainRow(props: Props) {
                             type="button"
                             onClick={() => props.onToggleDetail(row.id as string)}
                             aria-expanded={expanded}
-                            class="text-left font-medium hover:underline"
+                            class="rounded text-left font-medium hover:underline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
                         >
                             {row.hostname}
                         </button>
@@ -111,7 +111,7 @@ export function DomainRow(props: Props) {
                             <button
                                 type="button"
                                 onClick={() => props.onClassify(row)}
-                                class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-surface-2)]"
+                                class="rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
                                 style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}
                             >
                                 Clasificar

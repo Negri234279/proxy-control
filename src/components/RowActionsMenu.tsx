@@ -34,7 +34,7 @@ function MenuItem({
             tabIndex={-1}
             aria-disabled={disabled ? 'true' : 'false'}
             onClick={disabled ? undefined : onClick}
-            class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)] focus:bg-[var(--color-surface-2)] focus:outline-none aria-disabled:opacity-40"
+            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)] focus:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none focus-visible:ring-inset aria-disabled:opacity-40"
             style={danger ? { color: 'var(--color-error)' } : undefined}
         >
             <span aria-hidden="true" class="w-4 text-center">
@@ -51,7 +51,11 @@ export function RowActionsMenu(props: Props) {
     const { open, position, openMenu, setOpen, menuRef, triggerRef, onMenuKeyDown } = useRowActionsMenu()
 
     if (props.reconciling) {
-        return <Spinner />
+        return (
+            <span class="inline-flex px-2 py-1" role="status" aria-label={`Reconciliando ${props.hostname}`}>
+                <Spinner />
+            </span>
+        )
     }
 
     const busy = props.pending
@@ -69,7 +73,7 @@ export function RowActionsMenu(props: Props) {
                 aria-expanded={open}
                 aria-label={`Acciones de ${props.hostname}`}
                 onClick={() => (open ? setOpen(false) : openMenu())}
-                class="rounded-md px-2 py-1 text-base leading-none transition-colors hover:bg-[var(--color-surface-2)]"
+                class="rounded-md p-2 text-base leading-none transition-colors hover:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
             >
                 ⋮
             </button>
@@ -90,16 +94,11 @@ export function RowActionsMenu(props: Props) {
                               backgroundColor: 'var(--color-surface)',
                           }}
                       >
-                          <MenuItem
-                              glyph="↻"
-                              label="Reconciliar"
-                              disabled={busy}
-                              onClick={() => run(props.onReconcile)}
-                          />
-                          <MenuItem glyph="✎" label="Editar" disabled={busy} onClick={() => run(props.onEdit)} />
+                          <MenuItem glyph="↻" label="Reconciliar" onClick={() => run(props.onReconcile)} />
+                          <MenuItem glyph="✎" label="Editar" onClick={() => run(props.onEdit)} />
                           {props.present ? (
                               <MenuItem
-                                  glyph={props.enabled ? '○' : '◉'}
+                                  glyph="⏻"
                                   label={props.enabled ? 'Deshabilitar' : 'Habilitar'}
                                   disabled={busy}
                                   onClick={() => run(() => props.onToggleEnabled(!props.enabled))}

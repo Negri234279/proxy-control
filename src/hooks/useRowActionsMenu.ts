@@ -26,27 +26,36 @@ export function useRowActionsMenu() {
         }
     }, [])
 
-    const openMenu = useCallback(() => {
+    const computePosition = useCallback((): MenuPosition | null => {
         const rect = triggerRef.current?.getBoundingClientRect()
         if (!rect) {
-            return
+            return null
         }
         const up = rect.bottom + ESTIMATED_MENU_HEIGHT > window.innerHeight
-        setPosition({
-            left: rect.right,
+        return {
+            // `left` es el borde derecho de anclaje (el menú se extiende a la izquierda con
+            // translateX(-100%)); se clampa al viewport para que no se salga en pantallas estrechas.
+            left: Math.min(window.innerWidth - 8, Math.max(8, rect.right)),
             top: up ? rect.top - 4 : rect.bottom + 4,
             up,
-        })
-        setOpen(true)
+        }
     }, [])
+
+    const openMenu = useCallback(() => {
+        const next = computePosition()
+        if (!next) {
+            return
+        }
+        setPosition(next)
+        setOpen(true)
+    }, [computePosition])
 
     const items = useCallback((): HTMLElement[] => {
         const nodes = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')
         return nodes ? Array.from(nodes) : []
     }, [])
 
-    // Cierra al hacer click fuera del menú y su trigger, y al hacer scroll/resize (la posición
-    // fija dejaría de estar anclada). El scroll se escucha en captura para pillar scrolls internos.
+    // Cierra al hacer click fuera del menú y su trigger.
     useEffect(() => {
         if (!open) {
             return
@@ -57,17 +66,32 @@ export function useRowActionsMenu() {
                 setOpen(false)
             }
         }
-        const onDismiss = () => setOpen(false)
-
         document.addEventListener('mousedown', onDocClick)
-        window.addEventListener('scroll', onDismiss, true)
-        window.addEventListener('resize', onDismiss)
-        return () => {
-            document.removeEventListener('mousedown', onDocClick)
-            window.removeEventListener('scroll', onDismiss, true)
-            window.removeEventListener('resize', onDismiss)
-        }
+        return () => document.removeEventListener('mousedown', onDocClick)
     }, [open])
+
+    // Al hacer scroll/resize, RE-ANCLA el menú al trigger (posición fija) en vez de cerrarlo de
+    // golpe; solo lo cierra si el trigger ha salido del viewport. El scroll se escucha en captura
+    // para pillar también scrolls de contenedores internos.
+    useEffect(() => {
+        if (!open) {
+            return
+        }
+        const reposition = () => {
+            const rect = triggerRef.current?.getBoundingClientRect()
+            if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) {
+                setOpen(false)
+                return
+            }
+            setPosition(computePosition())
+        }
+        window.addEventListener('scroll', reposition, true)
+        window.addEventListener('resize', reposition)
+        return () => {
+            window.removeEventListener('scroll', reposition, true)
+            window.removeEventListener('resize', reposition)
+        }
+    }, [open, computePosition])
 
     // Al abrir, mueve el foco al primer item accionable.
     useEffect(() => {

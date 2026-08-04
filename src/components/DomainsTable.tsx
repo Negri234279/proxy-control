@@ -91,7 +91,7 @@ export function DomainsTable(props: Props) {
                             <button
                                 type="button"
                                 onClick={props.onRetry}
-                                class="rounded-md border px-3 py-1.5 text-sm hover:bg-[var(--color-surface-2)]"
+                                class="rounded-md border px-3 py-1.5 text-sm hover:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
                                 style={{ borderColor: 'var(--color-border)' }}
                             >
                                 Reintentar
@@ -106,7 +106,7 @@ export function DomainsTable(props: Props) {
                             <button
                                 type="button"
                                 onClick={props.onAdd}
-                                class="rounded-md px-3 py-1.5 text-sm font-medium text-white"
+                                class="rounded-md px-3 py-1.5 text-sm font-medium text-white focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] focus-visible:outline-none"
                                 style={{ backgroundColor: 'var(--color-accent)' }}
                             >
                                 + Añadir dominio

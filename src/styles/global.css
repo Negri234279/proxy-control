@@ -79,3 +79,13 @@ option {
     background-size: 400px 100%;
     animation: pc-shimmer 1.4s ease-in-out infinite;
 }
+
+/* Respeta a quien reduce el movimiento: los indicadores dejan de animar pero siguen
+   siendo visibles (el pulso queda en opacidad plena, el spinner estático). */
+@media (prefers-reduced-motion: reduce) {
+    .pc-pulse,
+    .pc-shimmer,
+    .animate-spin {
+        animation: none;
+    }
+}

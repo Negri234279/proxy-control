@@ -22,7 +22,12 @@ function Chip({ color, glyph, label, pulsing }: { color: string; glyph: string; 
 // Estado (solo lectura) de habilitación del proxy host en NPM. La acción vive en el menú.
 export function ActiveIndicator({ present, enabled, pending }: Props) {
     if (!present) {
-        return <span class="text-[var(--color-neutral)]">—</span>
+        return (
+            <span class="text-[var(--color-neutral)]">
+                <span aria-hidden="true">—</span>
+                <span class="sr-only">No aplica</span>
+            </span>
+        )
     }
 
     if (pending) {
