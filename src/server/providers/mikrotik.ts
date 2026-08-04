@@ -35,7 +35,7 @@ function agentFor(tlsInsecure: boolean): Agent {
         agent = new Agent({ rejectUnauthorized: !tlsInsecure })
         agents.set(tlsInsecure, agent)
     }
-    
+
     return agent
 }
 
@@ -57,7 +57,13 @@ function mikrotikRequest<T>(api: MikrotikApi, method: string, path: string, body
 
         const req = request(
             new URL(base + path),
-            { method, agent: agentFor(api.tlsInsecure), headers, timeout: 8000 },
+            {
+                method,
+                agent: agentFor(api.tlsInsecure),
+                headers,
+                family: 4,
+                timeout: 8000,
+            },
             (res) => {
                 const chunks: Buffer[] = []
 
@@ -92,9 +98,12 @@ function mikrotikRequest<T>(api: MikrotikApi, method: string, path: string, body
         // Sin timeout, un Mikrotik inalcanzable colgaría la carga de la tabla.
         req.on('timeout', () => req.destroy(new Error('timeout tras 8s')))
 
-        req.on('error', (cause) =>
-            reject(new ProviderError('mikrotik', 'No se pudo contactar con Mikrotik', { cause })),
-        )
+        req.on('error', (cause) => {
+            const code = (cause as NodeJS.ErrnoException)?.code
+            const detail = code ?? (cause instanceof Error ? cause.message : 'desconocido')
+            
+            reject(new ProviderError('mikrotik', `No se pudo contactar con Mikrotik (${detail})`, { cause }))
+        })
 
         if (payload !== undefined) {
             req.write(payload)
