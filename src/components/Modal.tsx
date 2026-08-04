@@ -20,11 +20,11 @@ export function Modal({ title, onClose, children, footer }: Props) {
                 aria-modal="true"
                 aria-label={title}
                 onClick={(event) => event.stopPropagation()}
-                class="mt-12 w-full max-w-lg rounded-[var(--radius-card)] border"
+                class="mt-12 flex max-h-[calc(100vh-6rem)] w-full max-w-lg flex-col rounded-[var(--radius-card)] border"
                 style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
             >
                 <div
-                    class="flex items-center justify-between border-b px-5 py-3"
+                    class="flex shrink-0 items-center justify-between border-b px-5 py-3"
                     style={{ borderColor: 'var(--color-border)' }}
                 >
                     <h2 class="text-base font-semibold">{title}</h2>
@@ -37,10 +37,11 @@ export function Modal({ title, onClose, children, footer }: Props) {
                         ✕
                     </button>
                 </div>
-                <div class="px-5 py-4">{children}</div>
+                {/* Solo el cuerpo hace scroll: cabecera y footer (con el CTA) quedan siempre visibles. */}
+                <div class="flex-1 overflow-y-auto px-5 py-4">{children}</div>
                 {footer ? (
                     <div
-                        class="flex justify-end gap-2 border-t px-5 py-3"
+                        class="flex shrink-0 justify-end gap-2 border-t px-5 py-3"
                         style={{ borderColor: 'var(--color-border)' }}
                     >
                         {footer}

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'preact/hooks'
 import { api, type ApiError, type CreateDomainBody, type UpdateDomainBody } from '../lib/api'
+import { firstTabWithError, type FormTabId } from '../lib/domain-form-tabs'
 import {
     DEFAULT_NPM_OPTIONS,
     type CfRecordType,
@@ -65,10 +66,12 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
     const [form, setForm] = useState<DomainForm>(emptyForm)
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
     const [submitting, setSubmitting] = useState(false)
+    const [activeTab, setActiveTab] = useState<FormTabId>('detalles')
 
     const openAdd = useCallback(() => {
         setForm(emptyForm())
         setFieldErrors({})
+        setActiveTab('detalles')
         setMode('add')
         setEditingId(null)
         setIsOpen(true)
@@ -83,6 +86,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             forwardPort: row.forwardPort ? String(row.forwardPort) : '',
         })
         setFieldErrors({})
+        setActiveTab('detalles')
         setMode('classify')
         setEditingId(null)
         setIsOpen(true)
@@ -105,6 +109,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             cfProxied: row.cfProxied,
         })
         setFieldErrors({})
+        setActiveTab('detalles')
         setMode('edit')
         setEditingId(row.id)
         setIsOpen(true)
@@ -202,6 +207,11 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
 
             if (apiError.status === 400 && apiError.fields) {
                 setFieldErrors(apiError.fields)
+                // Salta a la primera pestaña que contiene un error para que no quede oculto.
+                const errorTab = firstTabWithError(apiError.fields)
+                if (errorTab) {
+                    setActiveTab(errorTab)
+                }
             } else {
                 pushToast('error', apiError.message)
             }
@@ -216,6 +226,8 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
         form,
         fieldErrors,
         submitting,
+        activeTab,
+        setActiveTab,
         openAdd,
         openClassify,
         openEdit,
