@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm'
+import type { DnsProviderScope, DnsProviderView } from '../../lib/dns-providers'
 import { env } from '../config/env'
 import { db } from '../db/client'
 import { dnsProviders, type DnsProvider, type Domain, type NewDnsProvider } from '../db/schema'
@@ -10,7 +11,7 @@ import { decryptJson, encryptJson } from './crypto'
 // en `secret`) y resuelve las credenciales de ejecución. Modelo genérico por `kind`/`scope`
 // para poder añadir a futuro otros proveedores (públicos u otros privados como Pi-hole/AdGuard).
 
-export type DnsProviderScope = 'public' | 'private'
+export type { DnsProviderScope }
 
 export interface CloudflareConfig {
     defaultPublicIp: string | null
@@ -187,4 +188,85 @@ export async function getCloudflareDefaultPublicIp(): Promise<string | null> {
     } catch {
         return null
     }
+}
+
+// ── CRUD (panel) ──
+
+export interface CreateProviderInput {
+    kind: string
+    scope: DnsProviderScope
+    name: string
+    config: Record<string, unknown>
+    // Campos secretos en claro; se cifran aquí. Null/undefined = sin secreto.
+    secret?: Record<string, unknown> | null
+    enabled?: boolean
+}
+
+export async function createProvider(input: CreateProviderInput): Promise<DnsProvider> {
+    await ensureSeeded()
+
+    const [row] = await db
+        .insert(dnsProviders)
+        .values({
+            kind: input.kind,
+            scope: input.scope,
+            name: input.name,
+            config: input.config,
+            secret: input.secret ? encryptJson(input.secret) : null,
+            enabled: input.enabled ?? true,
+        })
+        .returning()
+
+    return row
+}
+
+export interface UpdateProviderInput {
+    name?: string
+    config?: Record<string, unknown>
+    // undefined = no tocar el secreto existente; un objeto = re-cifrar con los valores nuevos.
+    secret?: Record<string, unknown>
+    enabled?: boolean
+}
+
+export async function updateProvider(id: string, patch: UpdateProviderInput): Promise<DnsProvider | null> {
+    const set: Partial<NewDnsProvider> = {}
+    if (patch.name !== undefined) {
+        set.name = patch.name
+    }
+
+    if (patch.config !== undefined) {
+        set.config = patch.config
+    }
+
+    if (patch.enabled !== undefined) {
+        set.enabled = patch.enabled
+    }
+    
+    if (patch.secret !== undefined) {
+        set.secret = encryptJson(patch.secret)
+    }
+
+    const [row] = await db.update(dnsProviders).set(set).where(eq(dnsProviders.id, id)).returning()
+    return row ?? null
+}
+
+export async function deleteProvider(id: string): Promise<void> {
+    await db.delete(dnsProviders).where(eq(dnsProviders.id, id))
+}
+
+// Vista para el panel: NUNCA expone el secreto (solo si está o no).
+export function toProviderView(row: DnsProvider): DnsProviderView {
+    return {
+        id: row.id,
+        kind: row.kind,
+        scope: row.scope,
+        name: row.name,
+        config: row.config,
+        hasSecret: Boolean(row.secret),
+        enabled: row.enabled,
+    }
+}
+
+export function decryptSecret<T>(row: DnsProvider): T | null {
+    return row.secret ? decryptJson<T>(row.secret) : null
 }

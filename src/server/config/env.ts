@@ -24,7 +24,7 @@ const boolFromEnv = (fallback: boolean) =>
 
 const schema = z
     .object({
-        NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+        NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
         HOST: z.string().min(1).default('0.0.0.0'),
         PORT: z.coerce.number().int().positive().default(4321),
 

@@ -1,3 +1,4 @@
+import type { DnsProviderView } from './dns-providers'
 import type {
     CfRecordType,
     CustomLocation,
@@ -11,6 +12,21 @@ import type {
     ReconcileState,
     Visibility,
 } from './domain-types'
+
+export interface CreateDnsProviderBody {
+    kind: string
+    name: string
+    config: Record<string, unknown>
+    secret?: Record<string, unknown> | null
+    enabled?: boolean
+}
+
+export interface UpdateDnsProviderBody {
+    name?: string
+    config?: Record<string, unknown>
+    secret?: Record<string, unknown>
+    enabled?: boolean
+}
 
 // Cliente de la API para el front. Same-origin; el navegador envía `Origin` (CSRF ok).
 
@@ -110,4 +126,19 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ enabled }),
         }).then((r) => r.enabled),
+    listDnsProviders: () =>
+        req<{ providers: DnsProviderView[] }>('/api/settings/dns-providers').then((r) => r.providers),
+    createDnsProvider: (body: CreateDnsProviderBody) =>
+        req<{ provider: DnsProviderView }>('/api/settings/dns-providers', {
+            method: 'POST',
+            body: JSON.stringify(body),
+        }).then((r) => r.provider),
+    updateDnsProvider: (id: string, body: UpdateDnsProviderBody) =>
+        req<{ provider: DnsProviderView }>(`/api/settings/dns-providers/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        }).then((r) => r.provider),
+    deleteDnsProvider: (id: string) => req<{ ok: boolean }>(`/api/settings/dns-providers/${id}`, { method: 'DELETE' }),
+    testDnsProvider: (id: string) =>
+        req<{ ok: boolean; detail: string }>(`/api/settings/dns-providers/${id}/test`, { method: 'POST' }),
 }

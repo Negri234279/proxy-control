@@ -68,6 +68,13 @@ export function AppHeader(props: Props) {
                 >
                     + Añadir dominio
                 </button>
+                <a
+                    href="/settings"
+                    class="rounded-md border px-3 py-1.5 text-sm hover:bg-[var(--color-surface-2)]"
+                    style={{ borderColor: 'var(--color-border)' }}
+                >
+                    Ajustes
+                </a>
                 {props.authEnabled ? (
                     <form method="post" action="/api/auth/logout">
                         <button
