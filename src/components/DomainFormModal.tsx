@@ -1,4 +1,5 @@
 import { useRef } from 'preact/hooks'
+import { useCertificateSelector } from '../hooks/useCertificateSelector'
 import type { useCreateDomain } from '../hooks/useCreateDomain'
 import { useNpmCertificates } from '../hooks/useNpmCertificates'
 import { useZoneSelector } from '../hooks/useZoneSelector'
@@ -73,11 +74,10 @@ function TabButton({
 export function DomainFormModal({ create }: { create: CreateDomain }) {
     const certificates = useNpmCertificates()
     const zoneSelector = useZoneSelector(create)
+    const matchCertificateOnBlur = useCertificateSelector(create, certificates)
     const tablistRef = useRef<HTMLDivElement>(null)
 
-    if (!create.isOpen) {
-        return null
-    }
+    if (!create.isOpen) return null
 
     const { form, fieldErrors, mode, activeTab } = create
     const meta = TITLES[mode]
@@ -171,6 +171,7 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                     onInput={(event) =>
                                         create.setField('hostname', (event.target as HTMLInputElement).value)
                                     }
+                                    onBlur={matchCertificateOnBlur}
                                     placeholder="app.domain.es"
                                 />
                                 <FieldError message={fieldErrors.hostname} />
@@ -386,8 +387,8 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                     ) : null}
 
                     {activeTab === 'dns' ? (
-                        isPublic ? (
-                            <>
+                        <>
+                            {isPublic ? (
                                 <fieldset class="rounded-md border p-3" style={inputStyle}>
                                     <legend class="px-1 text-sm font-medium">DNS (Cloudflare)</legend>
                                     <div class="flex flex-col gap-3">
@@ -464,40 +465,41 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                         />
                                     </div>
                                 </fieldset>
+                            ) : (
+                                <p
+                                    class="rounded-md px-3 py-2 text-xs text-[var(--color-muted)]"
+                                    style={{ backgroundColor: 'var(--color-surface-2)' }}
+                                >
+                                    ℹ Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM). El SSL usa
+                                    un certificado existente en NPM (elige el wildcard abajo).
+                                </p>
+                            )}
 
-                                <div>
-                                    <label class="mb-1 block text-sm font-medium">Certificado SSL</label>
-                                    <select
-                                        class={inputClass}
-                                        style={inputStyle}
-                                        value={form.certificateId}
-                                        onChange={(event) =>
-                                            create.setField('certificateId', (event.target as HTMLSelectElement).value)
-                                        }
-                                    >
-                                        <option value="new">Solicitar uno nuevo (Let’s Encrypt)</option>
-                                        {certificates.map((certificate) => (
-                                            <option key={certificate.id} value={String(certificate.id)}>
-                                                {certificate.niceName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p class="mt-1 text-xs text-[var(--color-muted)]">
-                                        «Nuevo» emite un certificado por hostname; o elige uno existente (p. ej. el
-                                        wildcard *.domain.es) para no depender de la emisión por host.
-                                    </p>
-                                </div>
-                            </>
-                        ) : (
-                            <p
-                                class="rounded-md px-3 py-2 text-xs text-[var(--color-muted)]"
-                                style={{ backgroundColor: 'var(--color-surface-2)' }}
-                            >
-                                ℹ Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM) y el SSL usa el
-                                certificado wildcard existente *.domain.es (DNS-01). No se emite uno nuevo ni se
-                                configura Cloudflare.
-                            </p>
-                        )
+                            <div>
+                                <label class="mb-1 block text-sm font-medium">Certificado SSL</label>
+                                <select
+                                    class={inputClass}
+                                    style={inputStyle}
+                                    value={form.certificateId}
+                                    onChange={(event) =>
+                                        create.setField('certificateId', (event.target as HTMLSelectElement).value)
+                                    }
+                                >
+                                    <option value="new">
+                                        {isPublic ? 'Solicitar uno nuevo (Let’s Encrypt)' : 'Automático (wildcard)'}
+                                    </option>
+                                    {certificates.map((certificate) => (
+                                        <option key={certificate.id} value={String(certificate.id)}>
+                                            {certificate.niceName}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p class="mt-1 text-xs text-[var(--color-muted)]">
+                                    Se preselecciona el certificado que cubre el dominio (wildcard *.base o exacto) si
+                                    existe. «Nuevo» emite uno por hostname con Let’s Encrypt (solo público).
+                                </p>
+                            </div>
+                        </>
                     ) : null}
                 </div>
             </div>
