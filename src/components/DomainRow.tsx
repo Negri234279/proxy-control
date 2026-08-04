@@ -1,4 +1,4 @@
-import type { DomainDiffView, DomainListItem } from '../lib/domain-types'
+import type { DomainDiffView, DomainListItem, ProviderCheckView } from '../lib/domain-types'
 import { dnsProviderLabel, stateMeta, type RowState } from '../lib/reconcile-state'
 import { Spinner } from './Spinner'
 import { StatusBadge } from './StatusBadge'
@@ -46,6 +46,27 @@ function IconButton({
         >
             {glyph}
         </button>
+    )
+}
+
+// Detalle de un proveedor en el desplegable: presencia y, si hay drift, las causas
+// (esperado vs real) una por línea.
+function ProviderDetail({ label, check }: { label: string; check: ProviderCheckView }) {
+    return (
+        <div class="flex flex-col gap-0.5">
+            <span>
+                {label}: {check.present ? 'presente' : 'ausente'}
+                {check.drift ? ' — drift' : ''}
+                {!check.drift && check.detail ? ` — ${check.detail}` : ''}
+            </span>
+            {check.reasons && check.reasons.length > 0 ? (
+                <ul class="ml-4 flex list-disc flex-col gap-0.5" style={{ color: stateMeta('drift').color }}>
+                    {check.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                    ))}
+                </ul>
+            ) : null}
+        </div>
     )
 }
 
@@ -147,14 +168,8 @@ export function DomainRow(props: Props) {
                             </span>
                         ) : detail ? (
                             <div class="flex flex-col gap-1">
-                                <span>
-                                    NPM: {detail.npm.present ? 'presente' : 'ausente'}
-                                    {detail.npm.detail ? ` — ${detail.npm.detail}` : ''}
-                                </span>
-                                <span>
-                                    DNS ({provider}): {detail.dns.present ? 'presente' : 'ausente'}
-                                    {detail.dns.detail ? ` — ${detail.dns.detail}` : ''}
-                                </span>
+                                <ProviderDetail label="NPM" check={detail.npm} />
+                                <ProviderDetail label={`DNS (${provider})`} check={detail.dns} />
                                 {detail.issues.length === 0 ? <span>Sin incidencias.</span> : null}
                             </div>
                         ) : (

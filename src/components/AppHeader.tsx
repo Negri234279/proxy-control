@@ -45,7 +45,7 @@ export function AppHeader(props: Props) {
     return (
         <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h1 class="text-xl font-semibold tracking-tight">proxy-control</h1>
+                <h1 class="text-xl font-semibold tracking-tight">proxy control</h1>
                 <p class="text-sm text-[var(--color-muted)]">Nginx Proxy Manager × reconciliación DNS</p>
             </div>
             <div class="flex items-center gap-3">

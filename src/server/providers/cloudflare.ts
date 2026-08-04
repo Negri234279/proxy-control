@@ -52,8 +52,16 @@ async function cfJson<T>(path: string, init: RequestInit = {}): Promise<T> {
     return envelope.result
 }
 
-export async function findRecord(name: string): Promise<CfDnsRecord | null> {
-    const records = await cfJson<CfDnsRecord[]>(`/zones/${ZONE}/dns_records?name=${encodeURIComponent(name)}`)
+// Filtra por nombre y, si se indica, por tipo. Un hostname puede tener varios registros
+// (p. ej. un CNAME web + un MX de correo): sin el tipo, `records[0]` es ambiguo.
+export async function findRecord(name: string, type?: CfRecordType): Promise<CfDnsRecord | null> {
+    const query = new URLSearchParams({ name })
+    if (type) {
+        query.set('type', type)
+    }
+
+    const records = await cfJson<CfDnsRecord[]>(`/zones/${ZONE}/dns_records?${query.toString()}`)
+    
     return records[0] ?? null
 }
 

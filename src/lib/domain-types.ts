@@ -91,6 +91,8 @@ export interface ProviderCheckView {
     present: boolean
     drift: boolean
     detail?: string
+    // Causas del drift, una por entrada (para listarlas en el desplegable).
+    reasons?: string[]
 }
 
 // Diff en vivo de un dominio (GET /api/domains/:id/status).

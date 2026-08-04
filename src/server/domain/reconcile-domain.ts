@@ -17,7 +17,8 @@ import { getDomainOrThrow } from './get-domain'
 
 async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Promise<void> {
     const desired = desiredCfRecord(domain)
-    const existing = await findRecord(domain.hostname)
+    // Solo el registro del tipo gestionado (ignora un MX/otros que compartan hostname).
+    const existing = await findRecord(domain.hostname, domain.cfRecordType)
 
     if (!existing) {
         const created = await createRecord(desired)

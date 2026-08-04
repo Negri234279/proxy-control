@@ -62,6 +62,9 @@ services:
             NODE_ENV: development
             HOST: 0.0.0.0
             PORT: 4321
+            # En Docker los eventos inotify del host montado no llegan al contenedor:
+            # activa el polling del watcher de Vite para que el hot reload funcione.
+            USE_POLLING: 'true'
             # Sobreescribe la DATABASE_URL del .env para apuntar al Postgres del stack.
             DATABASE_URL: postgresql://${POSTGRES_USER:-proxy_control}:${POSTGRES_PASSWORD:-proxy_control}@proxy-control-postgres:5432/${POSTGRES_DB:-proxy_control}
         depends_on:
