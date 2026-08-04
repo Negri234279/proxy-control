@@ -9,6 +9,9 @@ import { fetchJson } from './http'
 const BASE = 'https://api.cloudflare.com/client/v4'
 const ZONE = env.CLOUDFLARE_ZONE_ID
 
+// Marca los registros que gestiona esta app en el propio Cloudflare (visible en su UI).
+const MANAGED_COMMENT = 'Creado desde proxy-control'
+
 export interface CfDnsRecord {
     id: string
     type: string
@@ -67,6 +70,7 @@ export function createRecord(input: CreateRecordInput): Promise<CfDnsRecord> {
             name: input.name,
             content: input.content,
             proxied: input.proxied,
+            comment: MANAGED_COMMENT,
             ttl: 1,
         }),
     })
@@ -80,6 +84,7 @@ export function updateRecord(id: string, input: CreateRecordInput): Promise<CfDn
             name: input.name,
             content: input.content,
             proxied: input.proxied,
+            comment: MANAGED_COMMENT,
             ttl: 1,
         }),
     })
