@@ -12,6 +12,7 @@ export default defineConfig({
     vite: {
         plugins: [tailwindcss()],
         server: {
+            allowedHosts: ['proxy-control'],
             watch: usePolling ? { usePolling: true, interval: 300 } : undefined,
         },
     },
