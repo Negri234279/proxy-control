@@ -165,7 +165,7 @@ lista de dominios; esta tabla guarda la clasificación y el estado deseado/obser
 // tabla: proxy_control.domains
 {
   "id": "uuid",
-  "hostname": "app.negri.es",      // subdominio / proxy host en NPM
+  "hostname": "app.domain.es",      // subdominio / proxy host en NPM
   "visibility": "public",          // "public" | "private" | "unclassified"
 
   // Destino que NPM proxifica
@@ -187,7 +187,7 @@ lista de dominios; esta tabla guarda la clasificación y el estado deseado/obser
   // Política SSL (según visibility)
   "ssl": {
     "mode": "new",                 // public → "new" (LE por hostname)
-    //        "wildcard"           // private → cert wildcard existente (*.negri.es)
+    //        "wildcard"           // private → cert wildcard existente (*.domain.es)
     "certificate_id": null         // id del cert en NPM una vez asignado/emitido
   },
 
@@ -197,7 +197,7 @@ lista de dominios; esta tabla guarda la clasificación y el estado deseado/obser
     "content": "203.0.113.10",     // IP pública (A) u host destino (CNAME)
     "proxied": true,               // naranja (proxied) vs gris (DNS-only)
     "zone_id": "abc...",           // zona de CF (multizona); null → zona por defecto del proveedor
-    "zone_name": "negri.es"        // nombre de la zona (para mostrar)
+    "zone_name": "domain.es"        // nombre de la zona (para mostrar)
   },
 
   // Proveedor DNS que resuelve el dominio (FK → dns_providers). Null → el habilitado del scope.
@@ -250,21 +250,21 @@ Modelo **genérico** para poder añadir a futuro otros públicos o privados (p. 
 
 ### 2. Alta de dominio
 
-Dominio base **`negri.es`** y subdominios **`*.negri.es`**. Orden estricto y rollback
+Dominio base **`domain.es`** y subdominios **`*.domain.es`**. Orden estricto y rollback
 en fallo; si no se puede revertir, se deja `reconcile_state: 'error'`.
 
-**Público** (`negri.es` expuesto a internet):
+**Público** (`domain.es` expuesto a internet):
 1. **Cloudflare** — crea registro DNS. Por defecto **A** → IP pública, **proxied**
    (naranja), TTL auto. Configurable a **CNAME** y a **DNS-only** por dominio.
 2. **NPM** — crea el proxy host con los defaults de `npm_options` (ver abajo) y
    **SSL: solicita un certificado nuevo de Let's Encrypt** para ese hostname.
 3. **DB** — persiste la metadata.
 
-**Privado** (`*.negri.es` solo resoluble en LAN):
+**Privado** (`*.domain.es` solo resoluble en LAN):
 1. **Mikrotik** — crea entrada `/ip/dns/static` (name = hostname, address = IP interna
    de NPM).
 2. **NPM** — crea el proxy host con los defaults de `npm_options` y **SSL: usa el
-   certificado wildcard existente** `*.negri.es` / `negri.es` (emitido por **DNS-01**).
+   certificado wildcard existente** `*.domain.es` / `domain.es` (emitido por **DNS-01**).
    No solicita cert nuevo.
 3. **DB** — persiste la metadata.
 
@@ -283,9 +283,9 @@ en fallo; si no se puede revertir, se deja `reconcile_state: 'error'`.
 **Política SSL:**
 - **Público** → `certificate: 'new'` en NPM: **el flujo estándar de NPM de "solicitar un
   certificado nuevo" con Let's Encrypt** (sin DNS challenge → `dns_challenge: false`).
-- **Privado** → **DNS-01**: selecciona el `certificate_id` del wildcard `*.negri.es`
+- **Privado** → **DNS-01**: selecciona el `certificate_id` del wildcard `*.domain.es`
   ya presente en NPM. La app lo resuelve listando los certificados de NPM y casando por
-  `*.negri.es` / `negri.es`. No emite cert nuevo. (DNS-01 es exclusivo de privados.)
+  `*.domain.es` / `domain.es`. No emite cert nuevo. (DNS-01 es exclusivo de privados.)
 
 ### 3. Reconciliación
 - Compara el **estado deseado** (nuestra DB) con el **estado real** (NPM + Cloudflare o

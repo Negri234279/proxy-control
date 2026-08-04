@@ -196,7 +196,7 @@ en fallo (mapeado a HTTP 502).
 - [x] `createProxyHost(input)` → `POST /api/nginx/proxy-hosts`. Mapeo exacto de opciones:
   ```jsonc
   {
-    "domain_names": ["app.negri.es"],
+    "domain_names": ["app.domain.es"],
     "forward_scheme": "http",
     "forward_host": "192.168.1.50",
     "forward_port": 8080,
@@ -210,7 +210,7 @@ en fallo (mapeado a HTTP 502).
     // SSL:
     //  public  → "certificate_id": "new" + meta.dns_challenge: false
     //            (flujo estándar de NPM de "solicitar cert nuevo" con Let's Encrypt)
-    //  private → "certificate_id": <id del wildcard *.negri.es> (listCertificates),
+    //  private → "certificate_id": <id del wildcard *.domain.es> (listCertificates),
     //            sin meta de emisión (se reutiliza el cert existente)
     "certificate_id": "new",
     "meta": { "letsencrypt_agree": true, "dns_challenge": false }
@@ -218,7 +218,7 @@ en fallo (mapeado a HTTP 502).
   ```
   > SSL — **Público**: `certificate_id: "new"` con `dns_challenge: false`, es decir el
   > comportamiento por defecto de NPM al pedir un cert nuevo con Let's Encrypt.
-  > **Privado**: **DNS-01**, reutiliza el cert wildcard `*.negri.es` ya presente (no emite).
+  > **Privado**: **DNS-01**, reutiliza el cert wildcard `*.domain.es` ya presente (no emite).
   >
   > Implementado: `certificate_id: 'new'` → `meta.letsencrypt_agree: true` y
   > `dns_challenge` según input; con id numérico (wildcard) no se piden metadatos de emisión.

@@ -221,7 +221,7 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                     ) : (
                         <p class="text-sm text-[var(--color-muted)]">
                             Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM) y el SSL usa el
-                            certificado wildcard existente *.negri.es (DNS-01).
+                            certificado wildcard existente *.example.es (DNS-01).
                         </p>
                     )}
                 </Section>

@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm'
+import type { CfRecordType } from '../../lib/domain-types'
 import type { DnsProviderScope, DnsProviderView } from '../../lib/dns-providers'
 import { env } from '../config/env'
 import { db } from '../db/client'
@@ -15,6 +16,8 @@ export type { DnsProviderScope }
 
 export interface CloudflareConfig {
     defaultPublicIp: string | null
+    // Host destino por defecto para registros CNAME (los A usan defaultPublicIp).
+    defaultCname: string | null
     defaultZoneId: string | null
 }
 
@@ -37,7 +40,16 @@ export interface MikrotikSecret {
 export interface CloudflareRuntime {
     token: string
     defaultPublicIp: string | null
+    defaultCname: string | null
     defaultZoneId: string | null
+}
+
+// Contenido por defecto de un registro según su tipo: CNAME → host destino; A → IP pública.
+export function cloudflareDefaultContent(
+    recordType: CfRecordType,
+    defaults: { defaultPublicIp: string | null; defaultCname: string | null },
+): string | null {
+    return recordType === 'CNAME' ? defaults.defaultCname : defaults.defaultPublicIp
 }
 
 export interface MikrotikRuntime {
@@ -71,6 +83,7 @@ async function seedFromEnv(): Promise<void> {
             name: 'Cloudflare',
             config: {
                 defaultPublicIp: env.PUBLIC_IP ?? null,
+                defaultCname: null,
                 defaultZoneId: env.CLOUDFLARE_ZONE_ID ?? null,
             } satisfies CloudflareConfig,
             secret: encryptJson({ apiToken: env.CLOUDFLARE_API_TOKEN } satisfies CloudflareSecret),
@@ -141,6 +154,7 @@ export async function resolveCloudflare(): Promise<CloudflareRuntime> {
     return {
         token: secret.apiToken,
         defaultPublicIp: config.defaultPublicIp ?? null,
+        defaultCname: config.defaultCname ?? null,
         defaultZoneId: config.defaultZoneId ?? null,
     }
 }
@@ -187,6 +201,19 @@ export async function getCloudflareDefaultPublicIp(): Promise<string | null> {
         return (await resolveCloudflare()).defaultPublicIp
     } catch {
         return null
+    }
+}
+
+// Defaults de contenido por tipo (no lanza): para derivar el cfContent al crear/editar.
+export async function getCloudflareDefaults(): Promise<{
+    defaultPublicIp: string | null
+    defaultCname: string | null
+}> {
+    try {
+        const cf = await resolveCloudflare()
+        return { defaultPublicIp: cf.defaultPublicIp, defaultCname: cf.defaultCname }
+    } catch {
+        return { defaultPublicIp: null, defaultCname: null }
     }
 }
 
@@ -241,7 +268,7 @@ export async function updateProvider(id: string, patch: UpdateProviderInput): Pr
     if (patch.enabled !== undefined) {
         set.enabled = patch.enabled
     }
-    
+
     if (patch.secret !== undefined) {
         set.secret = encryptJson(patch.secret)
     }

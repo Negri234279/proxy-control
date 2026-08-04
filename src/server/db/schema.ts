@@ -49,7 +49,7 @@ export const domains = proxyControl.table('domains', {
     customLocations: jsonb('custom_locations').$type<CustomLocation[]>().notNull().default([]),
     advancedConfig: text('advanced_config').notNull().default(''),
 
-    // Política SSL: public → 'new' (LE nuevo); private → 'wildcard' (*.negri.es, DNS-01).
+    // Política SSL: public → 'new' (LE nuevo); private → 'wildcard' (*.domain.es, DNS-01).
     sslMode: sslModeEnum('ssl_mode'),
     certificateId: integer('certificate_id'),
 

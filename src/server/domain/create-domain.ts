@@ -8,7 +8,7 @@ import {
 import { db } from '../db/client'
 import { domains, type Domain, type NewDomain } from '../db/schema'
 import { ValidationError } from '../errors'
-import { getCloudflareDefaultPublicIp } from '../settings/dns-providers'
+import { cloudflareDefaultContent, getCloudflareDefaults } from '../settings/dns-providers'
 import { getDomainOrThrow } from './get-domain'
 import { reconcileDomain } from './reconcile-domain'
 
@@ -22,7 +22,7 @@ export interface CreateDomainInput {
     customLocations?: CustomLocation[]
     advancedConfig?: string
     // Certificado SSL: 'new' (solicitar uno nuevo de Let's Encrypt) o el id de un cert
-    // existente en NPM (p. ej. el wildcard *.negri.es). undefined = default por tipo.
+    // existente en NPM (p. ej. el wildcard *.domain.es). undefined = default por tipo.
     certificateId?: number | 'new'
     // Solo público:
     cfRecordType?: CfRecordType
@@ -46,8 +46,9 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
     const usesExistingCert = typeof input.certificateId === 'number'
     // sslMode es informativo: 'new' solo si es público y va a emitir cert nuevo.
     const sslMode = isPublic && !usesExistingCert ? 'new' : 'wildcard'
-    // IP pública por defecto del proveedor Cloudflare (config en DB), para registros A.
-    const defaultPublicIp = isPublic ? await getCloudflareDefaultPublicIp() : null
+    // Defaults del proveedor Cloudflare (config en DB): IP para registros A, host para CNAME.
+    const cfRecordType = input.cfRecordType ?? 'A'
+    const cfDefaults = isPublic ? await getCloudflareDefaults() : { defaultPublicIp: null, defaultCname: null }
 
     const row: NewDomain = {
         hostname: input.hostname,
@@ -61,8 +62,8 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         // Cert elegido: número = existente; 'new'/undefined = solicitar nuevo (público).
         certificateId: usesExistingCert ? (input.certificateId as number) : null,
         sslMode,
-        cfRecordType: input.cfRecordType ?? 'A',
-        cfContent: isPublic ? (input.cfContent ?? defaultPublicIp ?? null) : null,
+        cfRecordType,
+        cfContent: isPublic ? (input.cfContent ?? cloudflareDefaultContent(cfRecordType, cfDefaults) ?? null) : null,
         cfProxied: input.cfProxied ?? true,
         cfZoneId: isPublic ? (input.cfZoneId ?? null) : null,
         cfZoneName: isPublic ? (input.cfZoneName ?? null) : null,

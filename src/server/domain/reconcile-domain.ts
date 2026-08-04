@@ -23,7 +23,7 @@ async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Pro
     }
 
     const api: CloudflareApi = { token: cf.token, zoneId }
-    const desired = desiredCfRecord(domain, cf.defaultPublicIp)
+    const desired = desiredCfRecord(domain, cf)
     // Solo el registro del tipo gestionado (ignora un MX/otros que compartan hostname).
     const existing = await findRecord(api, domain.hostname, domain.cfRecordType)
 
@@ -90,7 +90,7 @@ async function ensureNpm(domain: Domain, updates: Partial<NewDomain>): Promise<v
 
     const updated = await updateProxyHost(existing.id, input)
     updates.npmProxyId = updated.id
-    
+
     if (updated.certificate_id > 0) {
         updates.certificateId = updated.certificate_id
         // Si el cert se acaba de asignar en este update (venía 'new'), re-aplica los flags SSL.

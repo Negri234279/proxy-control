@@ -45,6 +45,13 @@ export const PROVIDER_KINDS: ProviderKindDescriptor[] = [
                 placeholder: 'p. ej. 203.0.113.10 (para registros A)',
             },
             {
+                key: 'defaultCname',
+                label: 'CNAME por defecto',
+                type: 'text',
+                optional: true,
+                placeholder: 'host destino para registros CNAME (p. ej. ddns.domain.es)',
+            },
+            {
                 key: 'defaultZoneId',
                 label: 'Zona por defecto (id)',
                 type: 'text',

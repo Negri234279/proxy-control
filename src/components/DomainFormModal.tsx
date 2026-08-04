@@ -171,7 +171,7 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                     onInput={(event) =>
                                         create.setField('hostname', (event.target as HTMLInputElement).value)
                                     }
-                                    placeholder="app.negri.es"
+                                    placeholder="app.domain.es"
                                 />
                                 <FieldError message={fieldErrors.hostname} />
                             </div>
@@ -451,8 +451,8 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                                 }
                                                 placeholder={
                                                     form.cfRecordType === 'A'
-                                                        ? 'IP pública (o vacío = PUBLIC_IP)'
-                                                        : 'host destino'
+                                                        ? 'IP pública (o vacío = IP por defecto)'
+                                                        : 'host destino (o vacío = CNAME por defecto)'
                                                 }
                                             />
                                             <FieldError message={fieldErrors.cfContent} />
@@ -484,7 +484,7 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                     </select>
                                     <p class="mt-1 text-xs text-[var(--color-muted)]">
                                         «Nuevo» emite un certificado por hostname; o elige uno existente (p. ej. el
-                                        wildcard *.negri.es) para no depender de la emisión por host.
+                                        wildcard *.domain.es) para no depender de la emisión por host.
                                     </p>
                                 </div>
                             </>
@@ -494,7 +494,7 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                 style={{ backgroundColor: 'var(--color-surface-2)' }}
                             >
                                 ℹ Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM) y el SSL usa el
-                                certificado wildcard existente *.negri.es (DNS-01). No se emite uno nuevo ni se
+                                certificado wildcard existente *.domain.es (DNS-01). No se emite uno nuevo ni se
                                 configura Cloudflare.
                             </p>
                         )

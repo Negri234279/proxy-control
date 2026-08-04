@@ -4,7 +4,12 @@ import { db } from '../db/client'
 import { domains, type Domain } from '../db/schema'
 import { deleteRecord } from '../providers/cloudflare'
 import { deleteStaticDns } from '../providers/mikrotik'
-import { cloudflareApiForDomain, getCloudflareDefaultPublicIp, resolveMikrotik } from '../settings/dns-providers'
+import {
+    cloudflareApiForDomain,
+    cloudflareDefaultContent,
+    getCloudflareDefaults,
+    resolveMikrotik,
+} from '../settings/dns-providers'
 import { getDomainOrThrow } from './get-domain'
 import { reconcileDomain } from './reconcile-domain'
 
@@ -48,7 +53,8 @@ async function switchVisibility(current: Domain, patch: UpdateDomainInput): Prom
             .catch(() => undefined)
     }
 
-    const defaultPublicIp = isPublic ? await getCloudflareDefaultPublicIp() : null
+    const cfRecordType = patch.cfRecordType ?? current.cfRecordType
+    const cfDefaults = isPublic ? await getCloudflareDefaults() : { defaultPublicIp: null, defaultCname: null }
 
     // 2) Estado deseado nuevo: limpia ids del proveedor antiguo y re-deriva el certificado.
     const [updated] = await db
@@ -60,7 +66,9 @@ async function switchVisibility(current: Domain, patch: UpdateDomainInput): Prom
             mikrotikDnsId: null,
             certificateId: isPublic ? (patch.certificateId ?? null) : null,
             sslMode: isPublic ? 'new' : 'wildcard',
-            cfContent: isPublic ? (patch.cfContent ?? current.cfContent ?? defaultPublicIp ?? null) : null,
+            cfContent: isPublic
+                ? (patch.cfContent ?? current.cfContent ?? cloudflareDefaultContent(cfRecordType, cfDefaults) ?? null)
+                : null,
             cfZoneId: isPublic ? (patch.cfZoneId ?? current.cfZoneId ?? null) : null,
             cfZoneName: isPublic ? (patch.cfZoneName ?? current.cfZoneName ?? null) : null,
             reconcileState: 'missing',
