@@ -28,7 +28,9 @@ acciones de **reconciliación** cuando hay divergencias.
 >
 > 1. **DB**: Postgres compartido del core (`dbshared` + **pgbouncer**), esquema propio,
 >    con **Drizzle** (ORM + migraciones).
-> 2. **Cloudflare**: registro DNS **A/CNAME (proxied)** vía API token.
+> 2. **Cloudflare**: registro DNS **A/CNAME (proxied)** vía API token. **Multizona**: el token
+>    (config del proveedor en la DB, no en env) da acceso a todas las zonas; la zona se elige
+>    por dominio. Ver "Proveedores DNS" y el panel de Ajustes.
 > 3. **Público/privado**: **metadato en nuestra DB** (elegido al crear; los dominios
 >    preexistentes en NPM quedan `sin clasificar` hasta asignarles tipo).
 > 4. **Auth**: login simple de un usuario (credencial por env + cookie de sesión vía
@@ -123,7 +125,9 @@ Endpoints SSR de Astro (src/pages/api/*.ts)   ← toda la lógica de integració
 ```
 
 - Toda la lógica de red/integración **solo** se ejecuta en el servidor (SSR).
-  Nunca en el cliente. Los tokens/credenciales viven en variables de entorno.
+  Nunca en el cliente. Los secretos de **proveedores DNS** (token de Cloudflare, password de
+  Mikrotik) se guardan **cifrados en la DB** (editables por panel); el resto de credenciales
+  (NPM, DB, sesión) y la clave de cifrado `SETTINGS_KEY` viven en variables de entorno.
 - Los componentes Preact son islas hidratadas que llaman a los endpoints por `fetch`.
 - **Fuente de verdad**: NPM es la lista de dominios; nuestra DB guarda el *tipo*
   (público/privado), el *estado deseado* y el resultado de la última reconciliación.
@@ -191,9 +195,13 @@ lista de dominios; esta tabla guarda la clasificación y el estado deseado/obser
   "cloudflare": {
     "record_type": "A",            // "A" | "CNAME"
     "content": "203.0.113.10",     // IP pública (A) u host destino (CNAME)
-    "proxied": true                // naranja (proxied) vs gris (DNS-only)
+    "proxied": true,               // naranja (proxied) vs gris (DNS-only)
+    "zone_id": "abc...",           // zona de CF (multizona); null → zona por defecto del proveedor
+    "zone_name": "negri.es"        // nombre de la zona (para mostrar)
   },
 
+  // Proveedor DNS que resuelve el dominio (FK → dns_providers). Null → el habilitado del scope.
+  "dns_provider_id": null,
   "npm_proxy_id": 42,              // id del proxy host en NPM (null si aún no existe)
   "cloudflare_record_id": "abc123",// id del registro DNS en CF (solo públicos)
   "mikrotik_dns_id": "*1A",        // id de la entrada /ip/dns/static (solo privados)
@@ -206,8 +214,29 @@ lista de dominios; esta tabla guarda la clasificación y el estado deseado/obser
 
 > Nota: los dominios que ya existen en NPM pero no tienen fila aquí se muestran como
 > `unclassified` hasta que se les asigna tipo (público/privado) desde la app.
-> `npm_options`, `custom_locations` y `cloudflare.{record_type,proxied}` se guardan
-> como columnas JSONB; el resto como columnas tipadas.
+> `npm_options`, `custom_locations` se guardan como columnas JSONB; `cf_zone_id`/`cf_zone_name`
+> y el resto como columnas tipadas.
+
+### Proveedores DNS (`proxy_control.dns_providers`)
+
+Config de los proveedores DNS, editable desde el panel (**Ajustes → Proveedores DNS**).
+Modelo **genérico** para poder añadir a futuro otros públicos o privados (p. ej. Pi-hole/AdGuard):
+
+```jsonc
+// tabla: proxy_control.dns_providers
+{
+  "id": "uuid",
+  "kind": "cloudflare",            // "cloudflare" | "mikrotik" | … (decide el cliente)
+  "scope": "public",               // "public" | "private"
+  "name": "Cloudflare",
+  "config": { /* no-secreto */ },  // CF: { default_public_ip, default_zone_id } · MK: { base_url, user, tls_insecure, npm_internal_ip }
+  "secret": "v1:iv:tag:cipher",    // JSON CIFRADO (AES-256-GCM con SETTINGS_KEY): CF { api_token } · MK { password }
+  "enabled": true
+}
+```
+
+> Un dominio usa su `dns_provider_id` o, si es null, el proveedor **habilitado** de su scope.
+> El seed inicial crea Cloudflare/Mikrotik desde el `.env` legacy si está presente.
 
 ## Funcionalidades
 
@@ -290,13 +319,19 @@ Variables de entorno (dev en `.env`, no commitear):
 ```
 DATABASE_URL=postgresql://user:pass@pgbouncer-host:6432/dbshared?options=-csearch_path%3Dproxy_control
 NPM_BASE_URL=http://npm.lan:81
-NPM_TOKEN=...                 # o NPM_EMAIL / NPM_PASSWORD según auth de NPM
-CLOUDFLARE_API_TOKEN=...
-CLOUDFLARE_ZONE_ID=...
-MIKROTIK_BASE_URL=https://192.168.88.1
-MIKROTIK_USER=...
-MIKROTIK_PASSWORD=...
+NPM_EMAIL=...                 # + NPM_PASSWORD (auth de NPM)
+NPM_PASSWORD=...
+SESSION_SECRET=...            # firma de la cookie de sesión
+SETTINGS_KEY=...              # OBLIGATORIA: cifra los secretos de proveedores DNS en la DB
 ```
+
+> **Config de proveedores DNS (Cloudflare/Mikrotik): ya NO por env.** Vive en la DB (tabla
+> `proxy_control.dns_providers`) y se edita desde el panel web **Ajustes → Proveedores DNS**;
+> los secretos se guardan **cifrados** (AES-256-GCM con `SETTINGS_KEY`). Las variables
+> `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `PUBLIC_IP`, `MIKROTIK_*` y `NPM_INTERNAL_IP`
+> son **legacy/opcionales**: si están presentes en el primer arranque se usan solo para el
+> **seed** inicial de los proveedores. **Cloudflare es multizona**: basta el token; las zonas
+> se cargan en vivo y se eligen por dominio en el formulario (match por hostname, o ninguna).
 
 ## Docker / Infra
 
