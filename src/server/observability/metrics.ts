@@ -13,6 +13,15 @@ const domainsGauge = new Gauge({
     registers: [register],
 })
 
+// Estado por dominio (una serie por hostname): permite que las alertas nombren el
+// dominio concreto en el mensaje. Cardinalidad ~1 por dominio.
+const domainStateGauge = new Gauge({
+    name: 'proxy_control_domain_reconcile_state',
+    help: 'Estado de reconciliación actual de cada dominio (1 = estado vigente)',
+    labelNames: ['hostname', 'state'],
+    registers: [register],
+})
+
 export const reconcileCounter = new Counter({
     name: 'proxy_control_reconcile_total',
     help: 'Operaciones de reconciliación por resultado',
@@ -33,6 +42,14 @@ export async function collectMetrics(): Promise<string> {
 
     for (const [state, value] of counts) {
         domainsGauge.set({ state }, value)
+    }
+
+    // Reset + set deja solo la serie del estado vigente de cada dominio; las de estados
+    // anteriores desaparecen (p. ej. al pasar de 'error' a 'synced').
+    domainStateGauge.reset()
+
+    for (const row of rows) {
+        domainStateGauge.set({ hostname: row.hostname, state: row.reconcileState }, 1)
     }
 
     return register.metrics()

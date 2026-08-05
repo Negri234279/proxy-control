@@ -5,6 +5,7 @@ import { domains, type Domain, type NewDomain } from '../db/schema'
 import { ValidationError } from '../errors'
 import { createRecord, findRecord, updateRecord, type CloudflareApi } from '../providers/cloudflare'
 import { createStaticDns, listStaticDns, updateStaticDns } from '../providers/mikrotik'
+import { logger } from '../observability/logger'
 import { reconcileCounter } from '../observability/metrics'
 import { createProxyHost, listProxyHosts, updateProxyHost } from '../providers/npm'
 import { resolveCloudflare, resolveMikrotik } from '../settings/dns-providers'
@@ -137,6 +138,13 @@ export async function reconcileDomain(id: string): Promise<Domain> {
             .where(eq(domains.id, id))
 
         reconcileCounter.inc({ result: 'error' })
+
+        logger.error('reconcile failed', {
+            domainId: id,
+            hostname: domain.hostname,
+            visibility: domain.visibility,
+            error: error instanceof Error ? error.message : String(error),
+        })
 
         throw error
     }
