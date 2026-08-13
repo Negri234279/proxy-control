@@ -4,7 +4,7 @@ import { env } from './server/config/env'
 
 // Guard de sesión. Con AUTH_ENABLED=false queda desactivado (uso solo-LAN). Deja pasar
 // login, endpoints de observabilidad y los assets; el resto exige cookie válida.
-const PUBLIC_PATHS = new Set(['/login', '/api/auth/login', '/health', '/metrics'])
+const PUBLIC_PATHS = new Set(['/login', '/api/auth/login', '/health', '/metrics', '/api/widget'])
 
 export const onRequest = defineMiddleware((context, next) => {
     if (!env.AUTH_ENABLED) {
