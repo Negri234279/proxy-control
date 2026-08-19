@@ -1,4 +1,4 @@
-export type ProviderName = 'npm' | 'cloudflare' | 'mikrotik'
+export type ProviderName = 'npm' | 'cloudflare' | 'mikrotik' | 'docker'
 
 interface ProviderErrorOptions {
     status?: number

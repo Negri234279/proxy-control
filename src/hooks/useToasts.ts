@@ -21,7 +21,10 @@ export function useToasts() {
         (kind: ToastKind, message: string) => {
             const id = nextId++
             setToasts((prev) => [...prev, { id, kind, message }])
-            setTimeout(() => dismiss(id), 6000)
+            // Los errores persisten hasta descartarlos (suelen requerir acción); el resto expira.
+            if (kind !== 'error') {
+                setTimeout(() => dismiss(id), 6000)
+            }
         },
         [dismiss],
     )

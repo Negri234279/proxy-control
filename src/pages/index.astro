@@ -13,6 +13,6 @@ import { env } from '../server/config/env'
         <title>proxy-control</title>
     </head>
     <body>
-        <DomainsApp client:load authEnabled={env.AUTH_ENABLED} />
+        <DomainsApp client:load authEnabled={env.AUTH_ENABLED} dockerEnabled={env.DOCKER_LABELS_ENABLED} />
     </body>
 </html>

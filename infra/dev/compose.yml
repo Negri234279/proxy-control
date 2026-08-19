@@ -67,11 +67,14 @@ services:
             USE_POLLING: 'true'
             # Sobreescribe la DATABASE_URL del .env para apuntar al Postgres del stack.
             DATABASE_URL: postgresql://${POSTGRES_USER:-proxy_control}:${POSTGRES_PASSWORD:-proxy_control}@proxy-control-postgres:5432/${POSTGRES_DB:-proxy_control}
+            # Descubrimiento por labels de Docker (off por defecto). Lee el socket montado abajo.
+            DOCKER_LABELS_ENABLED: ${DOCKER_LABELS_ENABLED:-false}
+            DOCKER_LABEL_PREFIX: ${DOCKER_LABEL_PREFIX:-proxy-control}
         depends_on:
             proxy-control-postgres:
                 condition: service_healthy
         healthcheck:
-            test: ['CMD-SHELL', 'wget -q --spider http://localhost:4321/health || exit 1']
+            test: ['CMD-SHELL', 'wget -qO- http://localhost:4321/health || exit 1']
             interval: 15s
             timeout: 5s
             retries: 5
@@ -89,6 +92,8 @@ services:
             - ../../package.json:/app/package.json
             # La app lee este `.env` con process.loadEnvFile() (secretos con `$` intactos).
             - ../../.env:/app/.env:ro
+            # Socket de Docker (solo lectura): descubrimiento de dominios por labels.
+            - /var/run/docker.sock:/var/run/docker.sock:ro
         networks: [proxy-control-net]
         restart: unless-stopped
 

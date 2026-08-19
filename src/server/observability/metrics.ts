@@ -1,6 +1,7 @@
 import { collectDefaultMetrics, Counter, Gauge, Registry } from 'prom-client'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
+import { getDockerWatcherState } from '../docker/watcher'
 
 // Registro Prometheus + métricas de negocio. Se expone en GET /metrics.
 export const register = new Registry()
@@ -29,6 +30,25 @@ export const reconcileCounter = new Counter({
     registers: [register],
 })
 
+// Descubrimiento por Docker: dominios gestionados por labels, huérfanos y estado del worker.
+const dockerDomainsGauge = new Gauge({
+    name: 'proxy_control_docker_domains',
+    help: 'Número de dominios gestionados por labels de Docker',
+    registers: [register],
+})
+
+const dockerOrphansGauge = new Gauge({
+    name: 'proxy_control_docker_orphans',
+    help: 'Número de dominios docker huérfanos (container desaparecido)',
+    registers: [register],
+})
+
+const dockerWatcherConnectedGauge = new Gauge({
+    name: 'proxy_control_docker_watcher_connected',
+    help: 'Stream de eventos de Docker conectado (1) o no (0)',
+    registers: [register],
+})
+
 // Refresca el gauge de dominios desde la DB y devuelve el texto de exposición.
 export async function collectMetrics(): Promise<string> {
     const rows = await db.select().from(domains)
@@ -43,6 +63,11 @@ export async function collectMetrics(): Promise<string> {
     for (const [state, value] of counts) {
         domainsGauge.set({ state }, value)
     }
+
+    // Docker: gestionados por labels, huérfanos y conexión del worker.
+    dockerDomainsGauge.set(rows.filter((row) => row.source === 'docker').length)
+    dockerOrphansGauge.set(rows.filter((row) => row.orphanedAt !== null).length)
+    dockerWatcherConnectedGauge.set(getDockerWatcherState().connected ? 1 : 0)
 
     // Reset + set deja solo la serie del estado vigente de cada dominio; las de estados
     // anteriores desaparecen (p. ej. al pasar de 'error' a 'synced').

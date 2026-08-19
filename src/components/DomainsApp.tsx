@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks'
 import { useCreateDomain } from '../hooks/useCreateDomain'
 import { useDeleteDomain } from '../hooks/useDeleteDomain'
+import { useDiscover } from '../hooks/useDiscover'
 import { useDomainFilters } from '../hooks/useDomainFilters'
 import { useDomains } from '../hooks/useDomains'
 import { useDomainStatus } from '../hooks/useDomainStatus'
@@ -17,7 +18,13 @@ import { ToastRegion } from './ToastRegion'
 import { ToggleEnabledConfirmDialog } from './ToggleEnabledConfirmDialog'
 
 // Isla raíz: compone los hooks (toda la lógica de estado) y los componentes.
-export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
+export function DomainsApp({
+    authEnabled = false,
+    dockerEnabled = false,
+}: {
+    authEnabled?: boolean
+    dockerEnabled?: boolean
+}) {
     const { toasts, push, dismiss } = useToasts()
     const { status, domains, refetch, applyStatusSnapshot, patchRow, patchByNpmId } = useDomains()
     const [pollingEnabled, setPollingEnabled] = useState(true)
@@ -28,6 +35,7 @@ export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
     const del = useDeleteDomain({ refetch, pushToast: push })
     const domainStatus = useDomainStatus()
     const toggleEnabled = useToggleEnabled({ patchByNpmId, pushToast: push })
+    const discover = useDiscover({ refetch, pushToast: push })
 
     return (
         <div class="mx-auto max-w-6xl px-4 py-8">
@@ -36,6 +44,9 @@ export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
                 pollingFailed={polling.failed}
                 fleetRunning={reconcile.fleetRunning}
                 authEnabled={authEnabled}
+                dockerEnabled={dockerEnabled}
+                discoverRunning={discover.running}
+                onDiscover={discover.discover}
                 onReconcileAll={reconcile.reconcileAll}
                 onAdd={create.openAdd}
             />
@@ -47,6 +58,9 @@ export function DomainsApp({ authEnabled = false }: { authEnabled?: boolean }) {
                 setVisibility={filters.setVisibility}
                 state={filters.state}
                 setState={filters.setState}
+                source={filters.source}
+                setSource={filters.setSource}
+                dockerEnabled={dockerEnabled}
                 count={filters.filtered.length}
             />
 

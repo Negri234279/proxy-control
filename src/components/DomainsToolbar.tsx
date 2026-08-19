@@ -1,4 +1,4 @@
-import type { StateFilter, VisibilityFilter } from '../hooks/useDomainFilters'
+import type { SourceFilter, StateFilter, VisibilityFilter } from '../hooks/useDomainFilters'
 
 interface Props {
     query: string
@@ -7,6 +7,9 @@ interface Props {
     setVisibility: (value: VisibilityFilter) => void
     state: StateFilter
     setState: (value: StateFilter) => void
+    source: SourceFilter
+    setSource: (value: SourceFilter) => void
+    dockerEnabled: boolean
     count: number
 }
 
@@ -59,6 +62,23 @@ export function DomainsToolbar(props: Props) {
                     <option value="unclassified">Sin clasificar</option>
                 </select>
             </label>
+
+            {props.dockerEnabled ? (
+                <label class="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+                    Origen
+                    <select
+                        value={props.source}
+                        onChange={(event) => props.setSource((event.target as HTMLSelectElement).value as SourceFilter)}
+                        class={selectClass}
+                        style={selectStyle}
+                    >
+                        <option value="all">Todos</option>
+                        <option value="manual">Manual</option>
+                        <option value="docker">Docker</option>
+                        <option value="orphaned">Huérfanos</option>
+                    </select>
+                </label>
+            ) : null}
 
             <span class="text-sm text-[var(--color-muted)]">{props.count} dominios</span>
         </div>

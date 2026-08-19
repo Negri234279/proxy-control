@@ -30,6 +30,9 @@ export interface CreateDomainInput {
     cfProxied?: boolean
     cfZoneId?: string
     cfZoneName?: string
+    // Origen del alta: 'manual' (panel, default) o 'docker' (descubierto por labels).
+    source?: 'manual' | 'docker'
+    dockerContainerId?: string
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -67,6 +70,8 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         cfProxied: input.cfProxied ?? true,
         cfZoneId: isPublic ? (input.cfZoneId ?? null) : null,
         cfZoneName: isPublic ? (input.cfZoneName ?? null) : null,
+        source: input.source ?? 'manual',
+        dockerContainerId: input.dockerContainerId ?? null,
         reconcileState: 'missing',
     }
 

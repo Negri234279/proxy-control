@@ -6,6 +6,9 @@ interface Props {
     pollingFailed: boolean
     fleetRunning: boolean
     authEnabled: boolean
+    dockerEnabled: boolean
+    discoverRunning: boolean
+    onDiscover: () => void
     onReconcileAll: () => void
     onAdd: () => void
 }
@@ -48,8 +51,21 @@ export function AppHeader(props: Props) {
                 <h1 class="text-xl font-semibold tracking-tight">proxy control</h1>
                 <p class="text-sm text-[var(--color-muted)]">Nginx Proxy Manager × reconciliación DNS</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
                 <PollingIndicator lastUpdatedAt={props.lastUpdatedAt} failed={props.pollingFailed} />
+                {props.dockerEnabled ? (
+                    <button
+                        type="button"
+                        onClick={props.onDiscover}
+                        disabled={props.discoverRunning}
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-surface-2)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none disabled:opacity-60"
+                        style={{ borderColor: 'var(--color-border)' }}
+                        title="Descubrir dominios desde labels de Docker"
+                    >
+                        {props.discoverRunning ? <Spinner size={14} /> : null}
+                        {props.discoverRunning ? 'Descubriendo…' : 'Descubrir Docker'}
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={props.onReconcileAll}

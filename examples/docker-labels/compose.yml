@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────
+# Ejemplo: un servicio nginx descubierto por proxy-control vía labels de Docker.
+#
+# Con DOCKER_LABELS_ENABLED=true en proxy-control, este container se da de alta como un
+# dominio PRIVADO: se crea la entrada DNS estática en el Mikrotik (name = hostname,
+# address = IP interna de NPM) y el proxy host en NPM apuntando a forward.host:forward.port
+# con el certificado wildcard *.domain.es (DNS-01, no emite cert nuevo).
+#
+#   docker compose -f examples/docker-labels/compose.yml up -d
+#   # …y en el panel: "Descubrir Docker" (o espera al resync del worker)
+#
+# Política v1: TODO explícito en labels (visibility, forward.host y forward.port obligatorios).
+# forward.host debe ser alcanzable DESDE NPM. Aquí usamos el nombre del container publicado en
+# una red que NPM también comparta; ajústalo a tu topología (IP del host, otra red, etc.).
+# ─────────────────────────────────────────────────────────────
+name: proxy-control-example
+
+services:
+    demo-nginx:
+        image: nginx:1.27-alpine
+        container_name: demo-nginx
+        ports:
+            - '8088:80'
+        # Página de prueba para ver que el proxy resuelve al servicio.
+        command:
+            - sh
+            - -c
+            - "echo '<h1>demo-nginx tras proxy-control</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"
+        labels:
+            # ── Obligatorios ──
+            # Gate: sin este label a true, proxy-control ignora el container.
+            - proxy-control.enable=true
+            # Dominio privado (*.domain.es, resoluble solo en LAN vía Mikrotik).
+            - proxy-control.hostname=demo.negri.es
+            - proxy-control.visibility=private
+            # Destino que NPM proxifica (alcanzable desde NPM). En este ejemplo, el propio
+            # container por nombre en la red compartida + su puerto interno.
+            - proxy-control.forward.host=demo-nginx
+            - proxy-control.forward.port=80
+            # ── Opcionales ──
+            - proxy-control.forward.scheme=http # default http
+            # Certificado NPM existente por id (si se omite: público → cert nuevo LE; privado → wildcard).
+            # - proxy-control.ssl.certificate-id=15
+            # Cloudflare (solo público): zona, tipo de registro, contenido y proxied.
+            # - proxy-control.cf.record-type=A
+            # - proxy-control.cf.content=203.0.113.10
+            # - proxy-control.cf.proxied=true
+            # - proxy-control.cf.zone-id=<zone>
+            # ── Flags del proxy host de NPM (todos opcionales; default = todas las protecciones ON) ──
+            - proxy-control.npm.block-exploits=true
+            - proxy-control.npm.websockets=true
+            - proxy-control.npm.cache-assets=false
+            - proxy-control.npm.http2=true
+            - proxy-control.npm.hsts=true
+            - proxy-control.npm.hsts-subdomains=true
+            - proxy-control.npm.force-ssl=true
+            - proxy-control.npm.trust-forwarded-proto=false
+            # ── Config avanzada (nginx en crudo) del proxy host ──
+            - |
+                proxy-control.advanced-config=add_header X-Demo "proxy-control" always;
+            # ── Ubicaciones personalizadas (locations[]), indexadas por [N] ──
+            - proxy-control.location[0].path=/ws
+            - proxy-control.location[0].forward.host=demo-nginx
+            - proxy-control.location[0].forward.port=80
+            - proxy-control.location[0].forward.scheme=http
+            # - proxy-control.location[0].advanced-config=proxy_read_timeout 3600s;
+        networks: [proxy-control-net]
+        restart: unless-stopped
+
+networks:
+    # Reutiliza la red del stack de dev para que proxy-control/NPM alcancen al container por
+    # nombre. Debe existir (levanta antes infra/dev/compose.yml) o cámbiala por la tuya.
+    proxy-control-net:
+        external: true
+        name: proxy-control-dev-net

@@ -60,6 +60,16 @@ const schema = z
         // Clave para cifrar los secretos de proveedores DNS en la DB (AES-256-GCM). Se deriva
         // a 32 bytes con SHA-256, así que admite cualquier passphrase suficientemente larga.
         SETTINGS_KEY: z.string().min(16),
+
+        // Descubrimiento de dominios por labels de Docker (estilo Traefik). Deshabilitado por
+        // defecto. Con DOCKER_HOST se usa un endpoint tcp://; si no, el socket unix local.
+        DOCKER_LABELS_ENABLED: boolFromEnv(false),
+        DOCKER_SOCKET_PATH: z.string().min(1).default('/var/run/docker.sock'),
+        DOCKER_HOST: z.string().min(1).optional(),
+        DOCKER_LABEL_PREFIX: z.string().min(1).default('proxy-control'),
+        // Resync periódico de seguridad (ms) y ventana de debounce para agrupar eventos.
+        DOCKER_RESYNC_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+        DOCKER_EVENT_DEBOUNCE_MS: z.coerce.number().int().nonnegative().default(500),
     })
     .superRefine((value, ctx) => {
         if (!value.AUTH_ENABLED) {

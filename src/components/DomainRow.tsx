@@ -71,18 +71,47 @@ export function DomainRow(props: Props) {
                 }}
             >
                 <td class="py-3 pr-3 pl-4">
-                    {canExpand ? (
-                        <button
-                            type="button"
-                            onClick={() => props.onToggleDetail(row.id as string)}
-                            aria-expanded={expanded}
-                            class="rounded text-left font-medium hover:underline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
-                        >
-                            {row.hostname}
-                        </button>
-                    ) : (
-                        <span class="font-medium">{row.hostname}</span>
-                    )}
+                    <div class="flex flex-col gap-1">
+                        {canExpand ? (
+                            <button
+                                type="button"
+                                onClick={() => props.onToggleDetail(row.id as string)}
+                                aria-expanded={expanded}
+                                class="rounded text-left font-medium hover:underline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
+                            >
+                                {row.hostname}
+                            </button>
+                        ) : (
+                            <span class="font-medium">{row.hostname}</span>
+                        )}
+                        {row.source === 'docker' || row.orphaned ? (
+                            <div class="flex flex-wrap items-center gap-1">
+                                {row.source === 'docker' ? (
+                                    <span
+                                        class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
+                                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
+                                        aria-label="Dominio gestionado por labels de Docker"
+                                        title="Dominio gestionado por labels de Docker"
+                                    >
+                                        docker
+                                    </span>
+                                ) : null}
+                                {row.orphaned ? (
+                                    <span
+                                        class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
+                                        style={{
+                                            borderColor: stateMeta('missing').color,
+                                            color: stateMeta('missing').color,
+                                        }}
+                                        aria-label="Huérfano: el contenedor ya no existe; no se ha borrado, revísalo"
+                                        title="El contenedor ya no existe (no se ha borrado; revísalo)"
+                                    >
+                                        huérfano
+                                    </span>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
                 </td>
                 <td class="px-3 py-3 font-mono text-xs text-[var(--color-muted)]">{upstreamText(row)}</td>
                 <td class="px-3 py-3">

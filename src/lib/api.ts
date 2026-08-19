@@ -1,3 +1,4 @@
+import type { DockerSyncSummary, DockerWatcherState } from './docker'
 import type { CloudflareZone, DnsProviderView } from './dns-providers'
 import type {
     CfRecordType,
@@ -146,4 +147,6 @@ export const api = {
     testDnsProvider: (id: string) =>
         req<{ ok: boolean; detail: string }>(`/api/settings/dns-providers/${id}/test`, { method: 'POST' }),
     cloudflareZones: () => req<{ zones: CloudflareZone[] }>('/api/cloudflare/zones').then((r) => r.zones),
+    discover: () => req<{ summary: DockerSyncSummary }>('/api/discover', { method: 'POST' }).then((r) => r.summary),
+    dockerStatus: () => req<{ status: DockerWatcherState }>('/api/docker/status').then((r) => r.status),
 }

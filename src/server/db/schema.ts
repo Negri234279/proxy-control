@@ -12,6 +12,8 @@ export const sslModeEnum = proxyControl.enum('ssl_mode', ['new', 'wildcard'])
 export const cfRecordTypeEnum = proxyControl.enum('cf_record_type', ['A', 'CNAME'])
 export const reconcileStateEnum = proxyControl.enum('reconcile_state', ['synced', 'drift', 'missing', 'error'])
 export const dnsProviderScopeEnum = proxyControl.enum('dns_provider_scope', ['public', 'private'])
+// Origen del dominio: alta manual (panel) o descubierto por labels de Docker.
+export const domainSourceEnum = proxyControl.enum('domain_source', ['manual', 'docker'])
 
 // Proveedores DNS configurables (editables por panel). Modelo genérico: `kind` decide el
 // cliente (cloudflare, mikrotik, …), `scope` si resuelve dominios públicos o privados,
@@ -69,6 +71,12 @@ export const domains = proxyControl.table('domains', {
     npmProxyId: integer('npm_proxy_id'),
     cloudflareRecordId: text('cloudflare_record_id'),
     mikrotikDnsId: text('mikrotik_dns_id'),
+
+    // Origen y trazabilidad de descubrimiento por Docker. `orphanedAt` marca un dominio
+    // 'docker' cuyo container ya no existe (no se borra: se revisa/borra a mano).
+    source: domainSourceEnum('source').notNull().default('manual'),
+    dockerContainerId: text('docker_container_id'),
+    orphanedAt: timestamp('orphaned_at', { withTimezone: true }),
 
     // Estado de reconciliación.
     reconcileState: reconcileStateEnum('reconcile_state').notNull().default('missing'),

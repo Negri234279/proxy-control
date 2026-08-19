@@ -2,6 +2,7 @@
 // (islas Preact). Sin lógica: solo tipos y sus valores por defecto.
 
 export type Visibility = 'public' | 'private' | 'unclassified'
+export type DomainSource = 'manual' | 'docker'
 export type ForwardScheme = 'http' | 'https'
 export type SslMode = 'new' | 'wildcard'
 export type CfRecordType = 'A' | 'CNAME'
@@ -49,6 +50,9 @@ export interface DomainListItem {
     id: string | null
     hostname: string
     visibility: Visibility
+    // Origen del dominio y, si es 'docker', si su container ya no existe (huérfano).
+    source: DomainSource
+    orphaned: boolean
     forwardScheme: ForwardScheme | null
     forwardHost: string | null
     forwardPort: number | null
@@ -112,6 +116,8 @@ export interface DomainDetailView {
     id: string
     hostname: string
     visibility: Visibility
+    source: DomainSource
+    orphaned: boolean
     forwardScheme: ForwardScheme
     forwardHost: string | null
     forwardPort: number | null

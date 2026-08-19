@@ -8,7 +8,7 @@ import type {
     ReconcileState,
 } from '../lib/domain-types'
 import { NPM_OPTION_LABELS } from '../lib/npm-options'
-import { dnsProviderLabel } from '../lib/reconcile-state'
+import { dnsProviderLabel, stateMeta } from '../lib/reconcile-state'
 import { ActiveIndicator } from './ActiveIndicator'
 import { DomainDetailActions } from './DomainDetailActions'
 import { StatusBadge } from './StatusBadge'
@@ -37,6 +37,8 @@ function toListItem(domain: DomainDetailView, enabledInNpm: boolean): DomainList
         id: domain.id,
         hostname: domain.hostname,
         visibility: domain.visibility,
+        source: domain.source,
+        orphaned: domain.orphaned,
         forwardScheme: domain.forwardScheme,
         forwardHost: domain.forwardHost,
         forwardPort: domain.forwardPort,
@@ -125,6 +127,26 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                     <div class="flex flex-wrap items-center gap-3">
                         <h1 class="text-xl font-semibold">{domain.hostname}</h1>
                         <VisibilityPill visibility={domain.visibility} />
+                        {domain.source === 'docker' ? (
+                            <span
+                                class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
+                                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
+                                aria-label="Dominio gestionado por labels de Docker"
+                                title="Dominio gestionado por labels de Docker"
+                            >
+                                docker
+                            </span>
+                        ) : null}
+                        {domain.orphaned ? (
+                            <span
+                                class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
+                                style={{ borderColor: stateMeta('missing').color, color: stateMeta('missing').color }}
+                                aria-label="Huérfano: el contenedor ya no existe; no se ha borrado, revísalo"
+                                title="El contenedor ya no existe (no se ha borrado; revísalo)"
+                            >
+                                huérfano
+                            </span>
+                        ) : null}
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <StatusBadge state={providerState(status.npm)} provider="NPM" />

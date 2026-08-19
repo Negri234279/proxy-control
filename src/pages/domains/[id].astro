@@ -21,6 +21,8 @@ try {
         id: domain.id,
         hostname: domain.hostname,
         visibility: domain.visibility,
+        source: domain.source,
+        orphaned: domain.orphanedAt !== null,
         forwardScheme: domain.forwardScheme,
         forwardHost: domain.forwardHost,
         forwardPort: domain.forwardPort,
