@@ -11,7 +11,8 @@ on:
     push:
         branches: [master, main]
         paths:
-            - 'infra/**'
+            - 'infra/prod/**'
+            - 'infra/observability/**'
             - 'scripts/sync-pi-infra.sh'
             - '.github/workflows/sync-pi-infra.yml'
     workflow_dispatch: {}
