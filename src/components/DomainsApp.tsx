@@ -21,9 +21,11 @@ import { ToggleEnabledConfirmDialog } from './ToggleEnabledConfirmDialog'
 export function DomainsApp({
     authEnabled = false,
     dockerEnabled = false,
+    dockerMultiHost = false,
 }: {
     authEnabled?: boolean
     dockerEnabled?: boolean
+    dockerMultiHost?: boolean
 }) {
     const { toasts, push, dismiss } = useToasts()
     const { status, domains, refetch, applyStatusSnapshot, patchRow, patchByNpmId } = useDomains()
@@ -61,6 +63,11 @@ export function DomainsApp({
                 source={filters.source}
                 setSource={filters.setSource}
                 dockerEnabled={dockerEnabled}
+                dockerMultiHost={dockerMultiHost}
+                hostOptions={filters.hostOptions}
+                selectedHosts={filters.hosts}
+                onToggleHost={filters.toggleHost}
+                onClearHosts={filters.clearHosts}
                 count={filters.filtered.length}
             />
 

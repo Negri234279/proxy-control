@@ -52,6 +52,8 @@ export interface DomainListItem {
     visibility: Visibility
     // Origen del dominio y, si es 'docker', si su container ya no existe (huérfano).
     source: DomainSource
+    // Nombre del daemon (multi-host) del que se descubrió (solo 'docker'; null si legacy).
+    dockerHost: string | null
     orphaned: boolean
     forwardScheme: ForwardScheme | null
     forwardHost: string | null
@@ -117,6 +119,8 @@ export interface DomainDetailView {
     hostname: string
     visibility: Visibility
     source: DomainSource
+    // Nombre del daemon (multi-host) del que se descubrió (solo 'docker'; null si legacy).
+    dockerHost: string | null
     orphaned: boolean
     forwardScheme: ForwardScheme
     forwardHost: string | null

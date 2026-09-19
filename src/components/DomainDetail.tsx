@@ -38,6 +38,7 @@ function toListItem(domain: DomainDetailView, enabledInNpm: boolean): DomainList
         hostname: domain.hostname,
         visibility: domain.visibility,
         source: domain.source,
+        dockerHost: domain.dockerHost,
         orphaned: domain.orphaned,
         forwardScheme: domain.forwardScheme,
         forwardHost: domain.forwardHost,
@@ -131,10 +132,10 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                             <span
                                 class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
                                 style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
-                                aria-label="Dominio gestionado por labels de Docker"
-                                title="Dominio gestionado por labels de Docker"
+                                aria-label={`Dominio gestionado por labels de Docker en el host ${domain.dockerHost ?? 'desconocido'}`}
+                                title={`Dominio gestionado por labels de Docker en el host ${domain.dockerHost ?? 'desconocido'}`}
                             >
-                                docker
+                                {domain.dockerHost ?? 'docker'}
                             </span>
                         ) : null}
                         {domain.orphaned ? (

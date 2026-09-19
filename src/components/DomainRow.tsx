@@ -90,10 +90,10 @@ export function DomainRow(props: Props) {
                                     <span
                                         class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
                                         style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
-                                        aria-label="Dominio gestionado por labels de Docker"
-                                        title="Dominio gestionado por labels de Docker"
+                                        aria-label={`Dominio gestionado por labels de Docker en el host ${row.dockerHost ?? 'desconocido'}`}
+                                        title={`Dominio gestionado por labels de Docker en el host ${row.dockerHost ?? 'desconocido'}`}
                                     >
-                                        docker
+                                        {row.dockerHost ?? 'docker'}
                                     </span>
                                 ) : null}
                                 {row.orphaned ? (

@@ -1,4 +1,5 @@
 import type { SourceFilter, StateFilter, VisibilityFilter } from '../hooks/useDomainFilters'
+import { HostFilter } from './HostFilter'
 
 interface Props {
     query: string
@@ -10,6 +11,12 @@ interface Props {
     source: SourceFilter
     setSource: (value: SourceFilter) => void
     dockerEnabled: boolean
+    // Filtro por host (solo multi-host): opciones dinámicas + selección.
+    dockerMultiHost: boolean
+    hostOptions: string[]
+    selectedHosts: string[]
+    onToggleHost: (name: string) => void
+    onClearHosts: () => void
     count: number
 }
 
@@ -78,6 +85,15 @@ export function DomainsToolbar(props: Props) {
                         <option value="orphaned">Huérfanos</option>
                     </select>
                 </label>
+            ) : null}
+
+            {props.dockerMultiHost && props.hostOptions.length > 0 ? (
+                <HostFilter
+                    options={props.hostOptions}
+                    selected={props.selectedHosts}
+                    onToggle={props.onToggleHost}
+                    onClear={props.onClearHosts}
+                />
             ) : null}
 
             <span class="text-sm text-[var(--color-muted)]">{props.count} dominios</span>
