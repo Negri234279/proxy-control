@@ -4,6 +4,7 @@ import { useDeleteDomain } from '../hooks/useDeleteDomain'
 import { useDiscover } from '../hooks/useDiscover'
 import { useDomainFilters } from '../hooks/useDomainFilters'
 import { useDomains } from '../hooks/useDomains'
+import { useDomainSort } from '../hooks/useDomainSort'
 import { useDomainStatus } from '../hooks/useDomainStatus'
 import { usePolling } from '../hooks/usePolling'
 import { useReconcile } from '../hooks/useReconcile'
@@ -32,6 +33,7 @@ export function DomainsApp({
     const [pollingEnabled, setPollingEnabled] = useState(true)
     const polling = usePolling(applyStatusSnapshot, pollingEnabled)
     const filters = useDomainFilters(domains)
+    const sort = useDomainSort(filters.filtered)
     const reconcile = useReconcile({ patchRow, refetch, pushToast: push, setPollingEnabled })
     const create = useCreateDomain({ refetch, pushToast: push })
     const del = useDeleteDomain({ refetch, pushToast: push })
@@ -73,7 +75,10 @@ export function DomainsApp({
 
             <DomainsTable
                 status={status}
-                rows={filters.filtered}
+                rows={sort.sorted}
+                sortKey={sort.sortKey}
+                sortDir={sort.sortDir}
+                onSort={sort.toggleSort}
                 reconcilingIds={reconcile.reconcilingIds}
                 domainStatus={domainStatus}
                 togglingIds={toggleEnabled.togglingIds}

@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact'
 import type { LoadStatus } from '../hooks/useDomains'
+import type { SortDir, SortKey } from '../hooks/useDomainSort'
 import type { DomainDiffView, DomainListItem } from '../lib/domain-types'
 import { DomainRow } from './DomainRow'
 
@@ -16,6 +17,9 @@ interface Props {
     reconcilingIds: Set<string>
     domainStatus: DomainStatusView
     togglingIds: Set<number>
+    sortKey: SortKey
+    sortDir: SortDir
+    onSort: (key: SortKey) => void
     onToggleEnabled: (row: DomainListItem) => void
     onReconcile: (id: string, hostname: string) => void
     onEdit: (row: DomainListItem) => void
@@ -25,7 +29,16 @@ interface Props {
     onAdd: () => void
 }
 
-const COLUMNS = ['Hostname', 'Upstream', 'Visibilidad', 'NPM', 'DNS', 'Activo', '']
+// Columnas de la tabla. `key` = clave de ordenación (ausente → columna no ordenable).
+const COLUMNS: { label: string; key?: SortKey }[] = [
+    { label: 'Hostname', key: 'hostname' },
+    { label: 'Upstream', key: 'upstream' },
+    { label: 'Visibilidad', key: 'visibility' },
+    { label: 'NPM', key: 'npm' },
+    { label: 'DNS', key: 'dns' },
+    { label: 'Activo', key: 'active' },
+    { label: '' },
+]
 
 function SkeletonRows() {
     return (
@@ -69,16 +82,36 @@ export function DomainsTable(props: Props) {
                         class="sticky top-0 z-10 text-left text-xs tracking-wide text-[var(--color-muted)] uppercase"
                         style={{ backgroundColor: 'var(--color-surface)' }}
                     >
-                        {COLUMNS.map((column, index) => (
-                            <th
-                                key={column || index}
-                                scope="col"
-                                class="border-b px-3 py-2.5 font-medium first:pl-4 last:pr-4"
-                                style={{ borderColor: 'var(--color-border)' }}
-                            >
-                                {column}
-                            </th>
-                        ))}
+                        {COLUMNS.map((column, index) => {
+                            const active = column.key && column.key === props.sortKey
+                            return (
+                                <th
+                                    key={column.label || index}
+                                    scope="col"
+                                    aria-sort={
+                                        active ? (props.sortDir === 'asc' ? 'ascending' : 'descending') : undefined
+                                    }
+                                    class="border-b px-3 py-2.5 font-medium first:pl-4 last:pr-4"
+                                    style={{ borderColor: 'var(--color-border)' }}
+                                >
+                                    {column.key ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => props.onSort(column.key as SortKey)}
+                                            class="flex items-center gap-1 tracking-wide uppercase hover:text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:outline-none"
+                                            style={{ color: active ? 'var(--color-text)' : undefined }}
+                                        >
+                                            {column.label}
+                                            <span aria-hidden="true" class="text-[10px]">
+                                                {active ? (props.sortDir === 'asc' ? '▲' : '▼') : '↕'}
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        column.label
+                                    )}
+                                </th>
+                            )
+                        })}
                     </tr>
                 </thead>
                 <tbody>
