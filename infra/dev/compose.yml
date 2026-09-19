@@ -67,9 +67,12 @@ services:
             USE_POLLING: 'true'
             # Sobreescribe la DATABASE_URL del .env para apuntar al Postgres del stack.
             DATABASE_URL: postgresql://${POSTGRES_USER:-proxy_control}:${POSTGRES_PASSWORD:-proxy_control}@proxy-control-postgres:5432/${POSTGRES_DB:-proxy_control}
-            # Descubrimiento por labels de Docker (off por defecto). Lee el socket montado abajo.
+            # Descubrimiento por labels de Docker (off por defecto). Por defecto lee el socket
+            # montado abajo (un host). Para vigilar VARIOS daemons, define DOCKER_HOSTS en el
+            # .env como `nombre=url` separados por coma (p. ej. `pi=tcp://192.168.1.10:2375`).
             DOCKER_LABELS_ENABLED: ${DOCKER_LABELS_ENABLED:-false}
             DOCKER_LABEL_PREFIX: ${DOCKER_LABEL_PREFIX:-proxy-control}
+            DOCKER_HOSTS: ${DOCKER_HOSTS:-}
         depends_on:
             proxy-control-postgres:
                 condition: service_healthy

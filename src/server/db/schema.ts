@@ -74,7 +74,10 @@ export const domains = proxyControl.table('domains', {
 
     // Origen y trazabilidad de descubrimiento por Docker. `orphanedAt` marca un dominio
     // 'docker' cuyo container ya no existe (no se borra: se revisa/borra a mano).
+    // `dockerHost` guarda el nombre del daemon (multi-host) del que se descubrió, para no
+    // marcar huérfanos los dominios de un host que estaba inaccesible en la pasada.
     source: domainSourceEnum('source').notNull().default('manual'),
+    dockerHost: text('docker_host'),
     dockerContainerId: text('docker_container_id'),
     orphanedAt: timestamp('orphaned_at', { withTimezone: true }),
 

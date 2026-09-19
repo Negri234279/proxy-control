@@ -45,7 +45,8 @@ const dockerOrphansGauge = new Gauge({
 
 const dockerWatcherConnectedGauge = new Gauge({
     name: 'proxy_control_docker_watcher_connected',
-    help: 'Stream de eventos de Docker conectado (1) o no (0)',
+    help: 'Stream de eventos de Docker conectado (1) o no (0), por host',
+    labelNames: ['host'],
     registers: [register],
 })
 
@@ -64,10 +65,14 @@ export async function collectMetrics(): Promise<string> {
         domainsGauge.set({ state }, value)
     }
 
-    // Docker: gestionados por labels, huérfanos y conexión del worker.
+    // Docker: gestionados por labels, huérfanos y conexión del worker (por host).
     dockerDomainsGauge.set(rows.filter((row) => row.source === 'docker').length)
     dockerOrphansGauge.set(rows.filter((row) => row.orphanedAt !== null).length)
-    dockerWatcherConnectedGauge.set(getDockerWatcherState().connected ? 1 : 0)
+
+    dockerWatcherConnectedGauge.reset()
+    for (const host of getDockerWatcherState().hosts) {
+        dockerWatcherConnectedGauge.set({ host: host.name }, host.connected ? 1 : 0)
+    }
 
     // Reset + set deja solo la serie del estado vigente de cada dominio; las de estados
     // anteriores desaparecen (p. ej. al pasar de 'error' a 'synced').

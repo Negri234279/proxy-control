@@ -62,8 +62,17 @@ const schema = z
         SETTINGS_KEY: z.string().min(16),
 
         // Descubrimiento de dominios por labels de Docker (estilo Traefik). Deshabilitado por
-        // defecto. Con DOCKER_HOST se usa un endpoint tcp://; si no, el socket unix local.
+        // defecto.
+        //
+        // Multi-host: DOCKER_HOSTS es una lista separada por comas de daemons a vigilar, cada
+        // entrada `nombre=url` (el nombre etiqueta métricas/estado/trazabilidad) o solo `url`
+        // (nombre autogenerado). La url admite `tcp://host:port`, `unix:///ruta.sock` o una
+        // ruta de socket. Ej: `pi=tcp://proxy-a:2375,nas=unix:///var/run/docker.sock`.
+        //
+        // Legacy (un solo host): si DOCKER_HOSTS está vacío se usa DOCKER_HOST (tcp://) o, si
+        // tampoco, el socket unix local DOCKER_SOCKET_PATH.
         DOCKER_LABELS_ENABLED: boolFromEnv(false),
+        DOCKER_HOSTS: z.string().min(1).optional(),
         DOCKER_SOCKET_PATH: z.string().min(1).default('/var/run/docker.sock'),
         DOCKER_HOST: z.string().min(1).optional(),
         DOCKER_LABEL_PREFIX: z.string().min(1).default('proxy-control'),

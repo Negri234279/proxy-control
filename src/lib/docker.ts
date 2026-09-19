@@ -10,11 +10,18 @@ export interface DockerSyncSummary {
     errors: { hostname: string; error: string }[]
 }
 
+// Estado de conexión de un daemon de Docker vigilado (multi-host).
+export interface DockerHostStatus {
+    name: string
+    connected: boolean
+}
+
 // Estado del worker de descubrimiento (GET /api/docker/status).
 export interface DockerWatcherState {
     enabled: boolean
     running: boolean
-    connected: boolean
+    // Conexión por host: `true` si el stream de eventos de ese daemon está abierto.
+    hosts: DockerHostStatus[]
     lastSyncAt: string | null
     lastSummary: DockerSyncSummary | null
     lastError: string | null

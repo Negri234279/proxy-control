@@ -1,0 +1,1 @@
+ALTER TABLE "proxy_control"."domains" ADD COLUMN "docker_host" text;

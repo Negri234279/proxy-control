@@ -1,8 +1,8 @@
-import type { DockerWatcherState } from '../../lib/docker'
+import type { DockerHostStatus, DockerWatcherState } from '../../lib/docker'
 import { env } from '../config/env'
 import { logger } from '../observability/logger'
 import { streamEvents } from '../providers/docker'
-import { dockerApiFromEnv } from './api'
+import { dockerHostsFromEnv, type DockerHost } from './api'
 import { syncFromDocker } from './sync'
 
 // Worker singleton del descubrimiento por Docker (patrón "watch + reconcile"):
@@ -11,18 +11,24 @@ import { syncFromDocker } from './sync'
 //   3) resync periódico → red de seguridad ante eventos perdidos
 //   4) reconexión con backoff si el stream cae (+ resync al reconectar)
 //
+// Multi-host: se abre un stream de eventos POR daemon (cada uno con su backoff), pero el
+// sync es COMPARTIDO — cualquier evento de cualquier host dispara un único sync global (el
+// sync lee todos los hosts). La conexión se sigue por host para el estado/métricas.
+//
 // Nota: @astrojs/node standalone no expone un hook de "server start" para código de la app,
 // así que se arranca de forma idempotente desde el middleware (primer request). El container
 // one-shot de migraciones nunca lo toca (no levanta el server). Una sola instancia por proceso.
 
-const state: DockerWatcherState = {
+const state = {
     enabled: env.DOCKER_LABELS_ENABLED,
     running: false,
-    connected: false,
-    lastSyncAt: null,
-    lastSummary: null,
-    lastError: null,
+    lastSyncAt: null as string | null,
+    lastSummary: null as DockerWatcherState['lastSummary'],
+    lastError: null as string | null,
 }
+
+// Conexión por host (nombre → conectado). Se rellena al arrancar.
+const hostConnected = new Map<string, boolean>()
 
 let started = false
 let abort: AbortController | null = null
@@ -76,27 +82,28 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
     })
 }
 
-async function watchLoop(signal: AbortSignal): Promise<void> {
+// Stream de eventos de UN host, con reconexión y backoff propios. No dispara resync inicial
+// (lo cubre el scan inicial global); sí resync al reconectar tras una caída de ese host.
+async function watchHost(host: DockerHost, signal: AbortSignal): Promise<void> {
     let backoff = 1000
     let first = true
 
     while (!signal.aborted) {
-        // En cada (re)conexión salvo la primera (cubierta por el scan inicial), resync para
-        // recuperar eventos perdidos mientras el stream estaba caído.
         if (!first) {
-            void runSync('reconnect')
+            void runSync(`reconnect:${host.name}`)
         }
         first = false
 
         try {
-            state.connected = true
-            await streamEvents(dockerApiFromEnv(), scheduleDebounced, signal)
-            state.connected = false
+            hostConnected.set(host.name, true)
+            await streamEvents(host.api, scheduleDebounced, signal)
+            hostConnected.set(host.name, false)
             backoff = 1000
         } catch (error) {
-            state.connected = false
+            hostConnected.set(host.name, false)
             if (!signal.aborted) {
                 logger.warn('docker events stream lost, reconnecting', {
+                    host: host.name,
                     error: error instanceof Error ? error.message : String(error),
                     backoffMs: backoff,
                 })
@@ -118,17 +125,27 @@ export function ensureDockerWatcher(): void {
         return
     }
 
+    const hosts = dockerHostsFromEnv()
+
     started = true
     state.running = true
     abort = new AbortController()
 
+    hostConnected.clear()
+    for (const host of hosts) {
+        hostConnected.set(host.name, false)
+    }
+
     logger.info('docker watcher starting', {
+        hosts: hosts.map((host) => host.name),
         resyncIntervalMs: env.DOCKER_RESYNC_INTERVAL_MS,
         labelPrefix: env.DOCKER_LABEL_PREFIX,
     })
 
     void runSync('initial')
-    void watchLoop(abort.signal)
+    for (const host of hosts) {
+        void watchHost(host, abort.signal)
+    }
     resyncTimer = setInterval(() => void runSync('resync'), env.DOCKER_RESYNC_INTERVAL_MS)
 
     process.once('SIGTERM', stopDockerWatcher)
@@ -142,7 +159,7 @@ export function stopDockerWatcher(): void {
 
     started = false
     state.running = false
-    state.connected = false
+    hostConnected.clear()
 
     abort?.abort()
     abort = null
@@ -159,5 +176,7 @@ export function stopDockerWatcher(): void {
 }
 
 export function getDockerWatcherState(): DockerWatcherState {
-    return { ...state }
+    const hosts: DockerHostStatus[] = [...hostConnected].map(([name, connected]) => ({ name, connected }))
+
+    return { ...state, hosts }
 }

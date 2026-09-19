@@ -187,10 +187,19 @@ Omitted NPM flags fall back to the app defaults (all protections on). See a full
 | :-------------------------- | :----------------------- | :-------------------------------------------- |
 | `DOCKER_LABELS_ENABLED`     | `false`                  | Master switch for the feature                 |
 | `DOCKER_LABEL_PREFIX`       | `proxy-control`          | Label namespace                               |
-| `DOCKER_SOCKET_PATH`        | `/var/run/docker.sock`   | Unix socket to the daemon                     |
-| `DOCKER_HOST`               | —                        | `tcp://host:port` alternative to the socket   |
+| `DOCKER_HOSTS`              | —                        | Multi-host: comma-separated `name=url` list (takes priority) |
+| `DOCKER_SOCKET_PATH`        | `/var/run/docker.sock`   | Single host: unix socket to the daemon        |
+| `DOCKER_HOST`               | —                        | Single host: `tcp://host:port` alternative to the socket |
 | `DOCKER_RESYNC_INTERVAL_MS` | `60000`                  | Safety-net full resync interval               |
 | `DOCKER_EVENT_DEBOUNCE_MS`  | `500`                    | Coalesce a burst of events into one sync      |
+
+**Multiple hosts.** Set `DOCKER_HOSTS` to a comma-separated list of `name=url` entries to
+watch several Docker daemons at once (it takes priority over `DOCKER_HOST`/`DOCKER_SOCKET_PATH`).
+Each `url` accepts `tcp://host:port`, `unix:///path.sock`, or a socket path; the `name` labels
+metrics/status and is remembered per discovered domain, so **don't rename a host afterwards**.
+One event stream runs per daemon (each with its own backoff), and the sync is failure-isolated:
+if a host is unreachable its domains are **never** marked orphaned in that pass. Example:
+`DOCKER_HOSTS=local=unix:///var/run/docker.sock,pi2=tcp://192.168.1.20:2375`.
 
 ## Observability
 

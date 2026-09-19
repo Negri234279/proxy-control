@@ -32,6 +32,8 @@ export interface CreateDomainInput {
     cfZoneName?: string
     // Origen del alta: 'manual' (panel, default) o 'docker' (descubierto por labels).
     source?: 'manual' | 'docker'
+    // Nombre del daemon (multi-host) del que se descubrió (solo source='docker').
+    dockerHost?: string
     dockerContainerId?: string
 }
 
@@ -71,6 +73,7 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         cfZoneId: isPublic ? (input.cfZoneId ?? null) : null,
         cfZoneName: isPublic ? (input.cfZoneName ?? null) : null,
         source: input.source ?? 'manual',
+        dockerHost: input.dockerHost ?? null,
         dockerContainerId: input.dockerContainerId ?? null,
         reconcileState: 'missing',
     }
