@@ -1,14 +1,9 @@
 // Tipos del descubrimiento por Docker compartidos entre backend y front (respuestas de la API).
 
-// Resumen de una pasada de sincronización desde labels de Docker.
-export interface DockerSyncSummary {
-    created: number
-    updated: number
-    skipped: number
-    orphaned: number
-    unchanged: number
-    errors: { hostname: string; error: string }[]
-}
+import type { SyncSummary } from './discovery'
+
+// Resumen de una pasada de sincronización desde labels de Docker (forma genérica compartida).
+export type DockerSyncSummary = SyncSummary
 
 // Estado de conexión de un daemon de Docker vigilado (multi-host).
 export interface DockerHostStatus {

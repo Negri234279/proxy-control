@@ -79,6 +79,15 @@ const schema = z
         // Resync periódico de seguridad (ms) y ventana de debounce para agrupar eventos.
         DOCKER_RESYNC_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
         DOCKER_EVENT_DEBOUNCE_MS: z.coerce.number().int().nonnegative().default(500),
+
+        // Descubrimiento de dominios por fichero YAML (servicios que NO son contenedores, p. ej.
+        // paneles de Proxmox/TrueNAS). Deshabilitado por defecto. FILE_DOMAINS_PATH puede ser un
+        // fichero .yaml/.yml o un directorio con varios (se leen todos). Mismo patrón que Docker:
+        // watch + resync periódico. Ver validation/file-domains.ts para el formato del fichero.
+        FILE_DOMAINS_ENABLED: boolFromEnv(false),
+        FILE_DOMAINS_PATH: z.string().min(1).default('/config/domains.d'),
+        FILE_RESYNC_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+        FILE_EVENT_DEBOUNCE_MS: z.coerce.number().int().nonnegative().default(500),
     })
     .superRefine((value, ctx) => {
         if (!value.AUTH_ENABLED) {

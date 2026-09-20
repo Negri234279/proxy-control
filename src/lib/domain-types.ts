@@ -2,7 +2,7 @@
 // (islas Preact). Sin lógica: solo tipos y sus valores por defecto.
 
 export type Visibility = 'public' | 'private' | 'unclassified'
-export type DomainSource = 'manual' | 'docker'
+export type DomainSource = 'manual' | 'docker' | 'file'
 export type ForwardScheme = 'http' | 'https'
 export type SslMode = 'new' | 'wildcard'
 export type CfRecordType = 'A' | 'CNAME'
@@ -54,6 +54,8 @@ export interface DomainListItem {
     source: DomainSource
     // Nombre del daemon (multi-host) del que se descubrió (solo 'docker'; null si legacy).
     dockerHost: string | null
+    // Ruta del fichero YAML de origen (solo 'file').
+    sourceRef: string | null
     orphaned: boolean
     forwardScheme: ForwardScheme | null
     forwardHost: string | null
@@ -121,6 +123,8 @@ export interface DomainDetailView {
     source: DomainSource
     // Nombre del daemon (multi-host) del que se descubrió (solo 'docker'; null si legacy).
     dockerHost: string | null
+    // Ruta del fichero YAML de origen (solo 'file').
+    sourceRef: string | null
     orphaned: boolean
     forwardScheme: ForwardScheme
     forwardHost: string | null

@@ -207,7 +207,7 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     if (form.cfZoneId) {
                         body.cfZoneId = form.cfZoneId
                     }
-                    
+
                     if (form.cfZoneName) {
                         body.cfZoneName = form.cfZoneName
                     }

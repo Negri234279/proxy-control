@@ -293,6 +293,52 @@ en fallo; si no se puede revertir, se deja `reconcile_state: 'error'`.
 - Por dominio o para toda la flota. Reporta por dominio qué se creó/reparó.
 - Refresco periódico del estado desde la UI (polling a `/api/status`).
 
+### 4. Provisión declarativa (Docker labels y fichero YAML)
+
+Además del alta manual, hay dos fuentes **declarativas** que alimentan la misma
+reconciliación (motor compartido en `src/server/domain/spec-sync.ts`). Cada dominio recuerda
+su `source` (`manual` | `docker` | `file`); las fuentes automáticas **no** tocan filas de
+otra fuente (override manual = intocable). Quitar una declaración marca el dominio **huérfano**
+(nunca se borra solo). Patrón común: *watch + reconcile* (scan inicial → evento con debounce →
+resync periódico de seguridad).
+
+- **Docker** (`src/server/docker/`, `DOCKER_LABELS_ENABLED`): lee labels `proxy-control.*` de
+  containers, multi-host vía `DOCKER_HOSTS`. Trazabilidad en `docker_host`/`docker_container_id`.
+- **Fichero YAML** (`src/server/file/`, `FILE_DOMAINS_ENABLED`): para servicios que **NO son
+  contenedores** (paneles de Proxmox/TrueNAS, un switch, etc.). `FILE_DOMAINS_PATH` es un
+  fichero `.yaml`/`.yml` o un **directorio** con varios. Trazabilidad en `source_ref` (ruta).
+
+**Cómo crear/editar dominios con YAML** (formato en `src/server/validation/file-domains.ts`;
+parser → `DomainSpec` compartida → `createDomain`/`reconcileDomain`):
+
+```yaml
+domains:
+    - hostname: pve-web.negri.es
+      visibility: private                      # public | private
+      forward: { scheme: https, host: 192.168.1.10, port: 8006 }  # host/port obligatorios
+      npm: { websockets: true }                # flags opcionales (claves camelCase de NpmOptions)
+    - hostname: app.negri.es
+      visibility: public
+      forward: { scheme: http, host: 10.0.0.5, port: 8080 }
+      cloudflare: { recordType: A, content: 203.0.113.10, proxied: true }  # solo public
+      # opcionales: ssl.certificateId, advancedConfig, locations[] ({path, forward, advancedConfig})
+```
+
+Reglas al crear dominios por YAML:
+- **Privado** → resuelve por Mikrotik + cert wildcard existente en NPM (no emite cert nuevo).
+  **Público** → registro en Cloudflare + cert nuevo de Let's Encrypt.
+- Claves desconocidas se **rechazan** (schema `strict`); una entrada inválida se salta y se
+  reporta sin invalidar el resto del fichero.
+- El fichero es **fuente de verdad**: editar/quitar entradas crea/actualiza/orfana en el
+  siguiente sync. No dupliques en YAML un dominio que ya gestionas por Docker o a mano.
+
+**Dónde viven y cómo llegan a la Pi:** los YAML de prod viven en **`infra/prod/domains.d/`**
+(versionados; hay `panels.yaml.example` de plantilla). El workflow **`sync-pi-infra`** los
+espeja a **`pi-infra → apps/proxy-control/domains.d/`** (van dentro del mirror de `infra/prod/`,
+no son secretos), y `compose.yml` los monta read-only en **`/config/domains.d`**. Para dar de
+alta un panel nuevo: añade/edita un `.yaml` en `infra/prod/domains.d/`, haz push a `master`
+(dispara el sync) y asegúrate de `FILE_DOMAINS_ENABLED=true` en `proxy-control.env` de la Pi.
+
 ## UI / Estilo
 
 - Estética **minimalista y moderna**, con acentos **tipo neón** (bordes/glow) para los
@@ -345,6 +391,7 @@ infra/
   Dockerfile              # multi-stage Node 24 (base → deps → build → prod-deps → runtime, + dev)
   dev/    compose.yml  .env.example      # stack LOCAL completo (ver abajo)
   prod/   compose.yml  proxy-control.env.example  scrape.d/   # app + obs propia
+          domains.d/    # dominios estáticos por YAML (FILE_DOMAINS) → montado en /config/domains.d
   observability/        # única fuente de configs (prometheus, loki, alloy, alertmanager, grafana/*)
 scripts/sync-pi-infra.sh                 # sube prod + obs a pi-infra por PR
 .github/workflows/sync-pi-infra.yml      # abre PR a pi-infra y auto-merge

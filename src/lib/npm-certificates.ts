@@ -4,7 +4,7 @@
 
 export function certificateBaseWildcard(hostname: string): { base: string; wildcard: string } {
     const base = hostname.split('.').slice(1).join('.')
-    
+
     return {
         base,
         wildcard: `*.${base}`,

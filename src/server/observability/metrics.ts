@@ -2,6 +2,7 @@ import { collectDefaultMetrics, Counter, Gauge, Registry } from 'prom-client'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
 import { getDockerWatcherState } from '../docker/watcher'
+import { getFileWatcherState } from '../file/watcher'
 
 // Registro Prometheus + métricas de negocio. Se expone en GET /metrics.
 export const register = new Registry()
@@ -50,6 +51,19 @@ const dockerWatcherConnectedGauge = new Gauge({
     registers: [register],
 })
 
+// Descubrimiento por fichero YAML: dominios gestionados y estado del worker.
+const fileDomainsGauge = new Gauge({
+    name: 'proxy_control_file_domains',
+    help: 'Número de dominios gestionados por fichero YAML',
+    registers: [register],
+})
+
+const fileWatcherWatchingGauge = new Gauge({
+    name: 'proxy_control_file_watcher_watching',
+    help: 'Watch del fichero/directorio de dominios activo (1) o no (0)',
+    registers: [register],
+})
+
 // Refresca el gauge de dominios desde la DB y devuelve el texto de exposición.
 export async function collectMetrics(): Promise<string> {
     const rows = await db.select().from(domains)
@@ -67,12 +81,16 @@ export async function collectMetrics(): Promise<string> {
 
     // Docker: gestionados por labels, huérfanos y conexión del worker (por host).
     dockerDomainsGauge.set(rows.filter((row) => row.source === 'docker').length)
-    dockerOrphansGauge.set(rows.filter((row) => row.orphanedAt !== null).length)
+    dockerOrphansGauge.set(rows.filter((row) => row.source === 'docker' && row.orphanedAt !== null).length)
 
     dockerWatcherConnectedGauge.reset()
     for (const host of getDockerWatcherState().hosts) {
         dockerWatcherConnectedGauge.set({ host: host.name }, host.connected ? 1 : 0)
     }
+
+    // Fichero YAML: dominios gestionados y estado del watch.
+    fileDomainsGauge.set(rows.filter((row) => row.source === 'file').length)
+    fileWatcherWatchingGauge.set(getFileWatcherState().watching ? 1 : 0)
 
     // Reset + set deja solo la serie del estado vigente de cada dominio; las de estados
     // anteriores desaparecen (p. ej. al pasar de 'error' a 'synced').

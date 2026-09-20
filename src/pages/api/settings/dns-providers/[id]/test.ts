@@ -41,7 +41,7 @@ export const POST = route(async ({ params }) => {
             password: secret.password,
             tlsInsecure: config.tlsInsecure ?? false,
         })
-        
+
         return json({ ok: true, detail: `${entries.length} entrada(s) DNS estáticas` })
     }
 

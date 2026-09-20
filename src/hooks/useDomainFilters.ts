@@ -3,7 +3,7 @@ import type { DomainListItem, ReconcileState, Visibility } from '../lib/domain-t
 
 export type VisibilityFilter = Visibility | 'all'
 export type StateFilter = ReconcileState | 'unclassified' | 'all'
-export type SourceFilter = 'all' | 'manual' | 'docker' | 'orphaned'
+export type SourceFilter = 'all' | 'manual' | 'docker' | 'file' | 'orphaned'
 
 // Estado de UI local (sin red): búsqueda + filtros. Devuelve la vista derivada.
 export function useDomainFilters(domains: DomainListItem[]) {
@@ -46,7 +46,7 @@ export function useDomainFilters(domains: DomainListItem[]) {
             if (source === 'orphaned' && !domain.orphaned) {
                 return false
             }
-            if ((source === 'manual' || source === 'docker') && domain.source !== source) {
+            if ((source === 'manual' || source === 'docker' || source === 'file') && domain.source !== source) {
                 return false
             }
             // Con hosts seleccionados, solo dominios de esos hosts (implica origen docker).

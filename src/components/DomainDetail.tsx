@@ -7,6 +7,7 @@ import type {
     ProviderCheckView,
     ReconcileState,
 } from '../lib/domain-types'
+import { sourceBadge } from '../lib/domain-source'
 import { NPM_OPTION_LABELS } from '../lib/npm-options'
 import { dnsProviderLabel, stateMeta } from '../lib/reconcile-state'
 import { ActiveIndicator } from './ActiveIndicator'
@@ -39,6 +40,7 @@ function toListItem(domain: DomainDetailView, enabledInNpm: boolean): DomainList
         visibility: domain.visibility,
         source: domain.source,
         dockerHost: domain.dockerHost,
+        sourceRef: domain.sourceRef,
         orphaned: domain.orphaned,
         forwardScheme: domain.forwardScheme,
         forwardHost: domain.forwardHost,
@@ -106,6 +108,7 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
         ? `${domain.forwardScheme}://${domain.forwardHost}:${domain.forwardPort ?? ''}`
         : '—'
     const row = toListItem(domain, status.enabledInNpm)
+    const source = sourceBadge(domain.source, domain.dockerHost, domain.sourceRef)
     const goHome = () => {
         window.location.href = '/'
     }
@@ -128,14 +131,14 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                     <div class="flex flex-wrap items-center gap-3">
                         <h1 class="text-xl font-semibold">{domain.hostname}</h1>
                         <VisibilityPill visibility={domain.visibility} />
-                        {domain.source === 'docker' ? (
+                        {source ? (
                             <span
                                 class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
                                 style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
-                                aria-label={`Dominio gestionado por labels de Docker en el host ${domain.dockerHost ?? 'desconocido'}`}
-                                title={`Dominio gestionado por labels de Docker en el host ${domain.dockerHost ?? 'desconocido'}`}
+                                aria-label={source.title}
+                                title={source.title}
                             >
-                                {domain.dockerHost ?? 'docker'}
+                                {source.label}
                             </span>
                         ) : null}
                         {domain.orphaned ? (

@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import type { CfRecordType, CustomLocation, ForwardScheme, NpmOptions } from '../../lib/domain-types'
+import type { CustomLocation, NpmOptions } from '../../lib/domain-types'
 import { ValidationError } from '../errors'
+import type { DomainSpec } from './domain-spec'
 import { isHostname } from './hostname'
 
 // Traduce las labels de un container Docker (namespace configurable, p. ej. `proxy-control.*`)
@@ -19,22 +20,8 @@ const NPM_OPTION_LABELS: Record<string, keyof NpmOptions> = {
     'trust-forwarded-proto': 'trustForwardedProto',
 }
 
-// Spec derivada de labels. Se traduce luego a la fila deseada del dominio.
-export interface DockerDomainSpec {
-    hostname: string
-    visibility: 'public' | 'private'
-    forwardScheme: ForwardScheme
-    forwardHost: string
-    forwardPort: number
-    npmOptions?: Partial<NpmOptions>
-    advancedConfig?: string
-    customLocations?: CustomLocation[]
-    certificateId?: number
-    cfRecordType?: CfRecordType
-    cfContent?: string
-    cfProxied?: boolean
-    cfZoneId?: string
-}
+// Spec derivada de labels. Es la spec de dominio genérica (compartida con otras fuentes).
+export type DockerDomainSpec = DomainSpec
 
 const boolLabel = z.enum(['true', 'false']).transform((value) => value === 'true')
 

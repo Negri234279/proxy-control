@@ -73,7 +73,7 @@ export async function findRecord(api: CloudflareApi, name: string, type?: CfReco
     if (type) {
         query.set('type', type)
     }
-    
+
     const records = await cfJson<CfDnsRecord[]>(api.token, `/zones/${api.zoneId}/dns_records?${query.toString()}`)
     return records[0] ?? null
 }

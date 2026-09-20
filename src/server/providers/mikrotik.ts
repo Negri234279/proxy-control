@@ -101,7 +101,7 @@ function mikrotikRequest<T>(api: MikrotikApi, method: string, path: string, body
         req.on('error', (cause) => {
             const code = (cause as NodeJS.ErrnoException)?.code
             const detail = code ?? (cause instanceof Error ? cause.message : 'desconocido')
-            
+
             reject(new ProviderError('mikrotik', `No se pudo contactar con Mikrotik (${detail})`, { cause }))
         })
 

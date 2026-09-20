@@ -73,6 +73,9 @@ services:
             DOCKER_LABELS_ENABLED: ${DOCKER_LABELS_ENABLED:-false}
             DOCKER_LABEL_PREFIX: ${DOCKER_LABEL_PREFIX:-proxy-control}
             DOCKER_HOSTS: ${DOCKER_HOSTS:-}
+            # Descubrimiento por fichero YAML (paneles bare-metal). Lee ./domains.d montado abajo.
+            FILE_DOMAINS_ENABLED: ${FILE_DOMAINS_ENABLED:-false}
+            FILE_DOMAINS_PATH: /config/domains.d
         depends_on:
             proxy-control-postgres:
                 condition: service_healthy
@@ -97,6 +100,8 @@ services:
             - ../../.env:/app/.env:ro
             # Socket de Docker (solo lectura): descubrimiento de dominios por labels.
             - /var/run/docker.sock:/var/run/docker.sock:ro
+            # Dominios estáticos por fichero YAML (paneles bare-metal). Edita infra/prod/domains.d.
+            - ../prod/domains.d:/config/domains.d:ro
         networks: [proxy-control-net]
         restart: unless-stopped
 

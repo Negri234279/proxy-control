@@ -2,15 +2,17 @@ import { defineMiddleware } from 'astro:middleware'
 import { SESSION_COOKIE, verifySession } from './server/auth/session'
 import { env } from './server/config/env'
 import { ensureDockerWatcher } from './server/docker/watcher'
+import { ensureFileWatcher } from './server/file/watcher'
 
 // Guard de sesión. Con AUTH_ENABLED=false queda desactivado (uso solo-LAN). Deja pasar
 // login, endpoints de observabilidad y los assets; el resto exige cookie válida.
 const PUBLIC_PATHS = new Set(['/login', '/api/auth/login', '/health', '/metrics', '/api/widget'])
 
 export const onRequest = defineMiddleware((context, next) => {
-    // Arranca el descubrimiento por Docker una sola vez (no-op si está deshabilitado). No hay
-    // hook de "server start" en el adaptador node, así que el primer request lo enciende.
+    // Arranca los descubrimientos (Docker/fichero) una sola vez (no-op si están deshabilitados).
+    // No hay hook de "server start" en el adaptador node, así que el primer request los enciende.
     ensureDockerWatcher()
+    ensureFileWatcher()
 
     if (!env.AUTH_ENABLED) {
         return next()

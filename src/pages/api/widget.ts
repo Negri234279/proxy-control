@@ -16,7 +16,7 @@ export const GET: APIRoute = async () => {
 
         const counts = { synced: 0, drift: 0, missing: 0, error: 0 }
         let total = 0
-        
+
         for (const { state, n } of rows) {
             counts[state] = n
             total += n

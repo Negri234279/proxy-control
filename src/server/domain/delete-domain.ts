@@ -29,7 +29,7 @@ export async function deleteDomain(id: string, options: DeleteOptions = {}): Pro
                 .then((api) => deleteRecord(api, recordId))
                 .catch(() => undefined)
         }
-        
+
         if (domain.visibility === 'private' && domain.mikrotikDnsId) {
             const dnsId = domain.mikrotikDnsId
             await resolveMikrotik()

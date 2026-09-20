@@ -1,114 +1,19 @@
 import { eq } from 'drizzle-orm'
 import type { DockerSyncSummary } from '../../lib/docker'
-import { DEFAULT_NPM_OPTIONS } from '../../lib/domain-types'
-import { db } from '../db/client'
-import { domains, type Domain, type NewDomain } from '../db/schema'
-import { logger } from '../observability/logger'
-import { listContainers } from '../providers/docker'
-import { cloudflareDefaultContent, getCloudflareDefaults } from '../settings/dns-providers'
-import { parseContainerLabels, type DockerDomainSpec } from '../validation/docker-labels'
 import { env } from '../config/env'
-import { createDomain } from '../domain/create-domain'
-import { reconcileDomain } from '../domain/reconcile-domain'
-import type { DockerContainer } from '../providers/docker'
+import { db } from '../db/client'
+import { domains } from '../db/schema'
+import { createFromSpec, desiredFromSpec, matches, updateFromSpec } from '../domain/spec-sync'
+import { logger } from '../observability/logger'
+import { listContainers, type DockerContainer } from '../providers/docker'
+import { getCloudflareDefaults } from '../settings/dns-providers'
+import { parseContainerLabels, type DockerDomainSpec } from '../validation/docker-labels'
 import { dockerHostsFromEnv, enableLabel } from './api'
 
 // Sincroniza los dominios con las labels de los containers Docker. Idempotente: crea los
 // nuevos, actualiza los cambiados, salta los que ya coinciden y NO toca los desacoplados
 // (source='manual'). Marca huérfanos (sin borrar) los 'docker' cuyo container desapareció.
-
-// Columnas del dominio que gobiernan las labels (para comparar y decidir si hay cambios).
-interface DesiredColumns {
-    visibility: 'public' | 'private'
-    forwardScheme: 'http' | 'https'
-    forwardHost: string
-    forwardPort: number
-    npmOptions: NewDomain['npmOptions']
-    customLocations: NewDomain['customLocations']
-    advancedConfig: string
-    certificateId: number | null
-    cfRecordType: 'A' | 'CNAME'
-    cfContent: string | null
-    cfProxied: boolean
-    cfZoneId: string | null
-}
-
-function desiredFromSpec(
-    spec: DockerDomainSpec,
-    cfDefaults: { defaultPublicIp: string | null; defaultCname: string | null },
-): DesiredColumns {
-    const isPublic = spec.visibility === 'public'
-    const cfRecordType = spec.cfRecordType ?? 'A'
-
-    return {
-        visibility: spec.visibility,
-        forwardScheme: spec.forwardScheme,
-        forwardHost: spec.forwardHost,
-        forwardPort: spec.forwardPort,
-        npmOptions: { ...DEFAULT_NPM_OPTIONS, ...(spec.npmOptions ?? {}) },
-        customLocations: spec.customLocations ?? [],
-        advancedConfig: spec.advancedConfig ?? '',
-        certificateId: spec.certificateId ?? null,
-        cfRecordType,
-        cfContent: isPublic ? (spec.cfContent ?? cloudflareDefaultContent(cfRecordType, cfDefaults) ?? null) : null,
-        cfProxied: spec.cfProxied ?? true,
-        cfZoneId: isPublic ? (spec.cfZoneId ?? null) : null,
-    }
-}
-
-// True si la fila ya coincide con lo que dicen las labels (nada que aplicar).
-function matches(row: Domain, desired: DesiredColumns): boolean {
-    return (
-        row.visibility === desired.visibility &&
-        row.forwardScheme === desired.forwardScheme &&
-        row.forwardHost === desired.forwardHost &&
-        row.forwardPort === desired.forwardPort &&
-        row.certificateId === desired.certificateId &&
-        row.cfRecordType === desired.cfRecordType &&
-        row.cfContent === desired.cfContent &&
-        row.cfProxied === desired.cfProxied &&
-        row.cfZoneId === desired.cfZoneId &&
-        row.advancedConfig === desired.advancedConfig &&
-        JSON.stringify(row.npmOptions) === JSON.stringify(desired.npmOptions) &&
-        JSON.stringify(row.customLocations) === JSON.stringify(desired.customLocations)
-    )
-}
-
-async function applyExisting(
-    row: Domain,
-    containerId: string,
-    hostName: string,
-    desired: DesiredColumns,
-): Promise<void> {
-    await db
-        .update(domains)
-        .set({
-            visibility: desired.visibility,
-            forwardScheme: desired.forwardScheme,
-            forwardHost: desired.forwardHost,
-            forwardPort: desired.forwardPort,
-            npmOptions: desired.npmOptions,
-            customLocations: desired.customLocations,
-            advancedConfig: desired.advancedConfig,
-            certificateId: desired.certificateId,
-            sslMode: desired.visibility === 'public' && !desired.certificateId ? 'new' : 'wildcard',
-            cfRecordType: desired.cfRecordType,
-            cfContent: desired.cfContent,
-            cfProxied: desired.cfProxied,
-            cfZoneId: desired.cfZoneId,
-            // Si cambia el tipo, limpia los ids del proveedor antiguo para no dejar basura.
-            cloudflareRecordId: row.visibility === desired.visibility ? row.cloudflareRecordId : null,
-            mikrotikDnsId: row.visibility === desired.visibility ? row.mikrotikDnsId : null,
-            source: 'docker',
-            dockerHost: hostName,
-            dockerContainerId: containerId,
-            orphanedAt: null,
-            reconcileState: 'missing',
-        })
-        .where(eq(domains.id, row.id))
-
-    await reconcileDomain(row.id)
-}
+// La traducción spec→dominio y la comparación viven en domain/spec-sync (compartidas con File).
 
 // Un container descubierto junto al host del que proviene.
 interface DiscoveredContainer {
@@ -177,32 +82,16 @@ export async function syncFromDocker(): Promise<DockerSyncSummary> {
 
         const existing = byHostname.get(spec.hostname)
         const desired = desiredFromSpec(spec, cfDefaults)
+        const trace = { source: 'docker', dockerHost: host, dockerContainerId: container.Id, sourceRef: null } as const
 
         try {
             if (!existing) {
-                await createDomain({
-                    hostname: spec.hostname,
-                    visibility: spec.visibility,
-                    forwardScheme: spec.forwardScheme,
-                    forwardHost: spec.forwardHost,
-                    forwardPort: spec.forwardPort,
-                    npmOptions: desired.npmOptions ?? undefined,
-                    customLocations: spec.customLocations,
-                    advancedConfig: spec.advancedConfig,
-                    certificateId: spec.certificateId,
-                    cfRecordType: spec.cfRecordType,
-                    cfContent: spec.cfContent,
-                    cfProxied: spec.cfProxied,
-                    cfZoneId: spec.cfZoneId,
-                    source: 'docker',
-                    dockerHost: host,
-                    dockerContainerId: container.Id,
-                })
+                await createFromSpec(spec, desired, trace)
                 summary.created += 1
                 continue
             }
 
-            // Dominio desacoplado a mano (override): las labels no lo tocan.
+            // Dominio desacoplado a mano o de otra fuente (override): no lo tocamos.
             if (existing.source !== 'docker') {
                 summary.skipped += 1
                 continue
@@ -222,7 +111,7 @@ export async function syncFromDocker(): Promise<DockerSyncSummary> {
                 continue
             }
 
-            await applyExisting(existing, container.Id, host, desired)
+            await updateFromSpec(existing, desired, trace)
             summary.updated += 1
         } catch (error) {
             summary.errors.push({ hostname: spec.hostname, error: (error as Error).message })

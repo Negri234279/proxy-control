@@ -23,10 +23,12 @@ export function DomainsApp({
     authEnabled = false,
     dockerEnabled = false,
     dockerMultiHost = false,
+    fileEnabled = false,
 }: {
     authEnabled?: boolean
     dockerEnabled?: boolean
     dockerMultiHost?: boolean
+    fileEnabled?: boolean
 }) {
     const { toasts, push, dismiss } = useToasts()
     const { status, domains, refetch, applyStatusSnapshot, patchRow, patchByNpmId } = useDomains()
@@ -65,6 +67,7 @@ export function DomainsApp({
                 source={filters.source}
                 setSource={filters.setSource}
                 dockerEnabled={dockerEnabled}
+                fileEnabled={fileEnabled}
                 dockerMultiHost={dockerMultiHost}
                 hostOptions={filters.hostOptions}
                 selectedHosts={filters.hosts}

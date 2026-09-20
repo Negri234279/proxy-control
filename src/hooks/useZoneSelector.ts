@@ -40,7 +40,7 @@ export function useZoneSelector(create: CreateDomain) {
         if (mode !== 'add' || form.visibility !== 'public' || form.cfZoneId || zones.length === 0) {
             return
         }
-        
+
         const match = matchZone(form.hostname, zones)
         if (match) {
             setZone(match.id, match.name)

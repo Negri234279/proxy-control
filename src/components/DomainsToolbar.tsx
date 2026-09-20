@@ -11,6 +11,7 @@ interface Props {
     source: SourceFilter
     setSource: (value: SourceFilter) => void
     dockerEnabled: boolean
+    fileEnabled: boolean
     // Filtro por host (solo multi-host): opciones dinámicas + selección.
     dockerMultiHost: boolean
     hostOptions: string[]
@@ -70,7 +71,7 @@ export function DomainsToolbar(props: Props) {
                 </select>
             </label>
 
-            {props.dockerEnabled ? (
+            {props.dockerEnabled || props.fileEnabled ? (
                 <label class="flex items-center gap-2 text-sm text-[var(--color-muted)]">
                     Origen
                     <select
@@ -81,7 +82,8 @@ export function DomainsToolbar(props: Props) {
                     >
                         <option value="all">Todos</option>
                         <option value="manual">Manual</option>
-                        <option value="docker">Docker</option>
+                        {props.dockerEnabled ? <option value="docker">Docker</option> : null}
+                        {props.fileEnabled ? <option value="file">Fichero</option> : null}
                         <option value="orphaned">Huérfanos</option>
                     </select>
                 </label>

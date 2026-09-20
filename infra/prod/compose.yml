@@ -47,6 +47,12 @@ services:
             #   DOCKER_HOSTS=local=tcp://proxy-control-docker-proxy:2375,pi2=tcp://proxy-control-docker-proxy-pi2:2375
             # (levanta un docker-socket-proxy por host remoto — ver ejemplo comentado abajo).
             DOCKER_HOST: tcp://proxy-control-docker-proxy:2375
+            # Descubrimiento por fichero YAML (paneles bare-metal: Proxmox, TrueNAS…). Opt-in con
+            # FILE_DOMAINS_ENABLED=true en proxy-control.env. Lee ./domains.d montado abajo.
+            FILE_DOMAINS_PATH: /config/domains.d
+        volumes:
+            # Dominios estáticos declarativos (versionados en el repo, sincronizados a pi-infra).
+            - ./domains.d:/config/domains.d:ro
         depends_on:
             proxy-control-migrate:
                 condition: service_completed_successfully

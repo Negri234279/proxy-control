@@ -30,11 +30,13 @@ export interface CreateDomainInput {
     cfProxied?: boolean
     cfZoneId?: string
     cfZoneName?: string
-    // Origen del alta: 'manual' (panel, default) o 'docker' (descubierto por labels).
-    source?: 'manual' | 'docker'
+    // Origen del alta: 'manual' (panel, default), 'docker' (labels) o 'file' (YAML).
+    source?: 'manual' | 'docker' | 'file'
     // Nombre del daemon (multi-host) del que se descubrió (solo source='docker').
     dockerHost?: string
     dockerContainerId?: string
+    // Ruta del fichero YAML de origen (solo source='file').
+    sourceRef?: string
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -75,6 +77,7 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         source: input.source ?? 'manual',
         dockerHost: input.dockerHost ?? null,
         dockerContainerId: input.dockerContainerId ?? null,
+        sourceRef: input.sourceRef ?? null,
         reconcileState: 'missing',
     }
 

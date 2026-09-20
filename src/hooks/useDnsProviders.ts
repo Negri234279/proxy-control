@@ -178,7 +178,7 @@ export function useDnsProviders({ pushToast }: { pushToast: (kind: ToastKind, me
 
             pushToast('success', `${pendingDelete.name} eliminado`)
             setPendingDelete(null)
-            
+
             await refetch()
         } catch (error) {
             pushToast('error', (error as ApiError).message)

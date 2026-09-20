@@ -12,8 +12,8 @@ export const sslModeEnum = proxyControl.enum('ssl_mode', ['new', 'wildcard'])
 export const cfRecordTypeEnum = proxyControl.enum('cf_record_type', ['A', 'CNAME'])
 export const reconcileStateEnum = proxyControl.enum('reconcile_state', ['synced', 'drift', 'missing', 'error'])
 export const dnsProviderScopeEnum = proxyControl.enum('dns_provider_scope', ['public', 'private'])
-// Origen del dominio: alta manual (panel) o descubierto por labels de Docker.
-export const domainSourceEnum = proxyControl.enum('domain_source', ['manual', 'docker'])
+// Origen del dominio: alta manual (panel), labels de Docker o fichero YAML declarativo.
+export const domainSourceEnum = proxyControl.enum('domain_source', ['manual', 'docker', 'file'])
 
 // Proveedores DNS configurables (editables por panel). Modelo genérico: `kind` decide el
 // cliente (cloudflare, mikrotik, …), `scope` si resuelve dominios públicos o privados,
@@ -79,6 +79,8 @@ export const domains = proxyControl.table('domains', {
     source: domainSourceEnum('source').notNull().default('manual'),
     dockerHost: text('docker_host'),
     dockerContainerId: text('docker_container_id'),
+    // Referencia de trazabilidad de la fuente declarativa (solo 'file': la ruta del fichero YAML).
+    sourceRef: text('source_ref'),
     orphanedAt: timestamp('orphaned_at', { withTimezone: true }),
 
     // Estado de reconciliación.

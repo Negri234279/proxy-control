@@ -1,3 +1,4 @@
+import { sourceBadge } from '../lib/domain-source'
 import type { DomainDiffView, DomainListItem, ProviderCheckView } from '../lib/domain-types'
 import { dnsProviderLabel, stateMeta, type RowState } from '../lib/reconcile-state'
 import { ActiveIndicator } from './ActiveIndicator'
@@ -58,6 +59,7 @@ export function DomainRow(props: Props) {
     const dnsState: RowState = reconciling ? 'checking' : (row.dnsState ?? 'unclassified')
     const meta = stateMeta(rowState)
     const provider = dnsProviderLabel(row.visibility)
+    const source = sourceBadge(row.source, row.dockerHost, row.sourceRef)
     const canExpand = Boolean(row.id) && !isUnclassified
 
     return (
@@ -84,16 +86,16 @@ export function DomainRow(props: Props) {
                         ) : (
                             <span class="font-medium">{row.hostname}</span>
                         )}
-                        {row.source === 'docker' || row.orphaned ? (
+                        {source || row.orphaned ? (
                             <div class="flex flex-wrap items-center gap-1">
-                                {row.source === 'docker' ? (
+                                {source ? (
                                     <span
                                         class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
                                         style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
-                                        aria-label={`Dominio gestionado por labels de Docker en el host ${row.dockerHost ?? 'desconocido'}`}
-                                        title={`Dominio gestionado por labels de Docker en el host ${row.dockerHost ?? 'desconocido'}`}
+                                        aria-label={source.title}
+                                        title={source.title}
                                     >
-                                        {row.dockerHost ?? 'docker'}
+                                        {source.label}
                                     </span>
                                 ) : null}
                                 {row.orphaned ? (

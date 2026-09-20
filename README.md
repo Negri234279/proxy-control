@@ -201,6 +201,52 @@ One event stream runs per daemon (each with its own backoff), and the sync is fa
 if a host is unreachable its domains are **never** marked orphaned in that pass. Example:
 `DOCKER_HOSTS=local=unix:///var/run/docker.sock,pi2=tcp://192.168.1.20:2375`.
 
+## File-based discovery (YAML)
+
+For services that are **not containers** (Proxmox / TrueNAS web panels, a switch, a printer…),
+declare them in YAML. A file watcher reads them with the **same engine** as Docker discovery
+(watch + reconcile: create / update / orphan), tagging rows as `source: 'file'`.
+
+`FILE_DOMAINS_PATH` may be a single `.yaml`/`.yml` file or a **directory** of them (all `*.yaml`
+/`*.yml` are read). Removing an entry marks its domain **orphaned** (never auto-deleted); if the
+path can't be read, nothing is orphaned that pass.
+
+```yaml
+# domains.d/panels.yaml
+domains:
+    - hostname: pve-web.negri.es
+      visibility: private
+      forward: { scheme: https, host: 192.168.1.10, port: 8006 }
+      npm: { websockets: true } # Proxmox noVMC console needs websockets
+    - hostname: nas-web.negri.es
+      visibility: private
+      forward: { scheme: https, host: 192.168.1.20, port: 443 }
+    - hostname: app.negri.es # public: Cloudflare + new Let's Encrypt cert
+      visibility: public
+      forward: { scheme: http, host: 10.0.0.5, port: 8080 }
+      cloudflare: { recordType: A, content: 203.0.113.10, proxied: true }
+```
+
+Per-entry fields: `hostname`, `visibility` (`public`|`private`), `forward.{scheme,host,port}`
+(required `host`/`port`), optional `ssl.certificateId`, `advancedConfig`, `npm.{blockExploits,
+websockets,cacheAssets,http2,hsts,hstsSubdomains,forceSsl,trustForwardedProto}`, `locations[]`
+(`path` + `forward.{scheme,host,port}` + `advancedConfig`), and `cloudflare.{recordType,content,
+proxied,zoneId}` (public only). Unknown keys are rejected; a bad entry is skipped and reported
+without failing the rest of the file. Template: [`infra/prod/domains.d/panels.yaml.example`](./infra/prod/domains.d/panels.yaml.example).
+
+### File-discovery environment variables
+
+| Variable                  | Default             | Notes                                       |
+| :------------------------ | :------------------ | :------------------------------------------ |
+| `FILE_DOMAINS_ENABLED`    | `false`             | Master switch for the feature               |
+| `FILE_DOMAINS_PATH`       | `/config/domains.d` | A `.yaml`/`.yml` file or a directory of them |
+| `FILE_RESYNC_INTERVAL_MS` | `60000`             | Safety-net full resync interval             |
+| `FILE_EVENT_DEBOUNCE_MS`  | `500`               | Coalesce a burst of file changes into one sync |
+
+In prod, `infra/prod/domains.d/` is version-controlled and the `sync-pi-infra` workflow mirrors
+it to `pi-infra → apps/proxy-control/domains.d/`, which `compose.yml` mounts read-only at
+`/config/domains.d`. Add real `*.yaml` files there and enable `FILE_DOMAINS_ENABLED=true`.
+
 ## Observability
 
 The app exposes `/metrics` (Prometheus) and `/health`. In the dev stack, the
