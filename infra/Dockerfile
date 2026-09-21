@@ -70,7 +70,12 @@ USER node
 EXPOSE 4321
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD wget -qO- "http://127.0.0.1:${PORT}/health" || exit 1
-CMD ["node", "./dist/server/entry.mjs"]
+
+# Aplica migraciones pendientes ANTES de arrancar el servidor (idempotente: drizzle salta las
+# ya aplicadas). Imprescindible porque en prod el update lo hace Watchtower, que reinicia solo
+# la app y NO ejecuta el one-shot `proxy-control-migrate`; sin esto, un release con cambios de
+# esquema arrancaría con la DB desactualizada. Usa la conexión directa (MIGRATION_DATABASE_URL).
+CMD ["sh", "-c", "node ./migrate.mjs && node ./dist/server/entry.mjs"]
 
 # =========================================================================
 # Dev: hot reload. El código fuente se monta por volumen desde el compose.
