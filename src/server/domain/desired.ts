@@ -4,7 +4,7 @@ import { ValidationError } from '../errors'
 import type { CreateRecordInput } from '../providers/cloudflare'
 import type { CreateProxyHostInput } from '../providers/npm'
 import { cloudflareDefaultContent } from '../settings/dns-providers'
-import { resolveWildcardCertificateId } from './wildcard-certificate'
+import { findCertificateIdForHostname, resolveWildcardCertificateId } from './wildcard-certificate'
 
 // Defaults de contenido del registro CF (IP para A, host para CNAME), de la config del proveedor.
 export interface CloudflareDefaults {
@@ -23,6 +23,13 @@ export async function desiredCertificateId(domain: Domain): Promise<number | 'ne
     }
 
     if (domain.visibility === 'public') {
+        // Fuentes declarativas (YAML/Docker) sin cert elegido: reutiliza un cert existente que
+        // cubra el hostname (exacto/base/wildcard) y solo si no hay ninguno emite uno nuevo.
+        // El alta manual conserva 'new' explícito (sin auto-match).
+        if (domain.source === 'file' || domain.source === 'docker') {
+            return (await findCertificateIdForHostname(domain.hostname)) ?? 'new'
+        }
+
         return 'new'
     }
 
