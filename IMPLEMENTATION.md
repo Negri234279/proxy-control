@@ -149,6 +149,8 @@ infra/                          # Fase 9
 - [x] `src/server/db/schema.ts`: tabla `domains` en esquema `proxy_control`:
   `id (uuid, pk, default gen_random_uuid())`, `hostname (text, unique)`,
   `visibility (enum: public|private|unclassified)`,
+  `dns_only (bool, default false)` = solo registra la resolución, sin proxy host en NPM,
+  `dns_target (text null)` = IP destino del A estático del Mikrotik en solo-DNS privado,
   `forward_scheme (enum: http|https, default 'http')`, `forward_host (text)`,
   `forward_port (int)`,
   `npm_options (jsonb)` = `{ block_exploits, websockets, cache_assets, http2, hsts, force_ssl }`,

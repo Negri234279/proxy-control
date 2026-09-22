@@ -2,6 +2,7 @@ import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import type { DomainSpec } from './domain-spec'
 import { isHostname } from './hostname'
+import { isIpv4 } from './ip'
 
 // Traduce un fichero YAML de dominios estáticos (servicios que NO son contenedores, p. ej.
 // paneles de Proxmox/TrueNAS) a especificaciones de dominio. Mismo vocabulario que las labels
@@ -66,7 +67,12 @@ const entrySchema = z
     .object({
         hostname: z.string().refine(isHostname, 'hostname inválido'),
         visibility: z.enum(['public', 'private']),
-        forward: forwardSchema,
+        // Solo DNS: registra la resolución sin proxy host en NPM.
+        dnsOnly: z.boolean().optional(),
+        // Destino del A estático del Mikrotik en solo-DNS privado (IP del servicio real).
+        address: z.string().min(1).optional(),
+        // Upstream opcional: se exige solo cuando NO es solo-DNS.
+        forward: forwardSchema.optional(),
         npm: npmOptionsSchema.optional(),
         advancedConfig: z.string().optional(),
         locations: z.array(locationSchema).optional(),
@@ -74,6 +80,34 @@ const entrySchema = z
         cloudflare: cloudflareSchema.optional(),
     })
     .strict()
+    .superRefine((value, ctx) => {
+        // Con proxy host (no solo-DNS), el upstream es obligatorio.
+        if (!value.dnsOnly && !value.forward) {
+            ctx.addIssue({ code: 'custom', path: ['forward'], message: 'requerido (host/port) salvo en dnsOnly' })
+        }
+
+        // Solo-DNS privado: el destino (IP del A estático del Mikrotik) es obligatorio.
+        if (value.dnsOnly && value.visibility === 'private') {
+            if (!value.address) {
+                ctx.addIssue({
+                    code: 'custom',
+                    path: ['address'],
+                    message: 'requerido (IP destino) en dnsOnly privado',
+                })
+            } else if (!isIpv4(value.address)) {
+                ctx.addIssue({ code: 'custom', path: ['address'], message: 'debe ser una IPv4' })
+            }
+        }
+
+        // Solo-DNS público: el registro apunta directo al origen → contenido obligatorio.
+        if (value.dnsOnly && value.visibility === 'public' && !value.cloudflare?.content) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['cloudflare', 'content'],
+                message: 'requerido (destino del registro) en dnsOnly público',
+            })
+        }
+    })
 
 type Entry = z.infer<typeof entrySchema>
 
@@ -83,12 +117,15 @@ export interface FileDomainError {
 }
 
 function toSpec(entry: Entry): DomainSpec {
+    const dnsOnly = entry.dnsOnly ?? false
+
     return {
         hostname: entry.hostname,
         visibility: entry.visibility,
-        forwardScheme: entry.forward.scheme,
-        forwardHost: entry.forward.host,
-        forwardPort: entry.forward.port,
+        ...(dnsOnly ? { dnsOnly: true } : {}),
+        ...(dnsOnly && entry.visibility === 'private' && entry.address ? { dnsTarget: entry.address } : {}),
+        forwardScheme: entry.forward?.scheme ?? 'http',
+        ...(entry.forward ? { forwardHost: entry.forward.host, forwardPort: entry.forward.port } : {}),
         ...(entry.npm ? { npmOptions: entry.npm } : {}),
         ...(entry.advancedConfig !== undefined ? { advancedConfig: entry.advancedConfig } : {}),
         ...(entry.locations ? { customLocations: entry.locations } : {}),

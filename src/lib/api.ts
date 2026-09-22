@@ -57,9 +57,11 @@ export interface NpmCertificateOption {
 export interface CreateDomainBody {
     hostname: string
     visibility: 'public' | 'private'
+    dnsOnly?: boolean
+    dnsTarget?: string
     forwardScheme: ForwardScheme
-    forwardHost: string
-    forwardPort: number
+    forwardHost?: string
+    forwardPort?: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
     advancedConfig?: string
@@ -73,6 +75,8 @@ export interface CreateDomainBody {
 
 export interface UpdateDomainBody {
     visibility?: 'public' | 'private'
+    dnsOnly?: boolean
+    dnsTarget?: string | null
     forwardScheme?: ForwardScheme
     forwardHost?: string
     forwardPort?: number

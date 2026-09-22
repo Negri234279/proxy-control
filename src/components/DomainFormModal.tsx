@@ -201,46 +201,87 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                             </div>
 
                             <div>
-                                <label class="mb-1 block text-sm font-medium">Upstream</label>
-                                <div class="flex items-center gap-2">
-                                    <select
-                                        class="rounded-md border bg-transparent px-2 py-1.5 text-sm"
-                                        style={inputStyle}
-                                        value={form.forwardScheme}
-                                        onChange={(event) =>
-                                            create.setField(
-                                                'forwardScheme',
-                                                (event.target as HTMLSelectElement).value as ForwardScheme,
-                                            )
-                                        }
-                                    >
-                                        <option value="http">http</option>
-                                        <option value="https">https</option>
-                                    </select>
-                                    <span class="text-[var(--color-muted)]">://</span>
-                                    <input
-                                        class={inputClass}
-                                        style={inputStyle}
-                                        value={form.forwardHost}
-                                        onInput={(event) =>
-                                            create.setField('forwardHost', (event.target as HTMLInputElement).value)
-                                        }
-                                        placeholder="10.0.0.5"
-                                    />
-                                    <span class="text-[var(--color-muted)]">:</span>
-                                    <input
-                                        class="w-24 rounded-md border bg-transparent px-3 py-1.5 text-sm"
-                                        style={inputStyle}
-                                        type="number"
-                                        value={form.forwardPort}
-                                        onInput={(event) =>
-                                            create.setField('forwardPort', (event.target as HTMLInputElement).value)
-                                        }
-                                        placeholder="8080"
-                                    />
-                                </div>
-                                <FieldError message={fieldErrors.forwardHost ?? fieldErrors.forwardPort} />
+                                <Toggle
+                                    label="Solo DNS (sin proxy NPM)"
+                                    checked={form.dnsOnly}
+                                    onChange={(value) => create.setField('dnsOnly', value)}
+                                />
+                                <p class="mt-1 text-xs text-[var(--color-muted)]">
+                                    Registra solo la resolución (Cloudflare si público, Mikrotik si privado). No crea
+                                    proxy host en NPM ni gestiona SSL ni upstream.
+                                </p>
                             </div>
+
+                            {form.dnsOnly ? (
+                                isPublic ? (
+                                    <p
+                                        class="rounded-md px-3 py-2 text-xs text-[var(--color-muted)]"
+                                        style={{ backgroundColor: 'var(--color-surface-2)' }}
+                                    >
+                                        ℹ Configura el destino del registro (tipo, contenido, proxied) en la pestaña
+                                        DNS.
+                                    </p>
+                                ) : (
+                                    <div>
+                                        <label class="mb-1 block text-sm font-medium">IP destino (Mikrotik)</label>
+                                        <input
+                                            class={inputClass}
+                                            style={inputStyle}
+                                            value={form.dnsTarget}
+                                            onInput={(event) =>
+                                                create.setField('dnsTarget', (event.target as HTMLInputElement).value)
+                                            }
+                                            placeholder="192.168.1.20"
+                                        />
+                                        <p class="mt-1 text-xs text-[var(--color-muted)]">
+                                            IP a la que resolverá el hostname (entrada A estática del Mikrotik).
+                                        </p>
+                                        <FieldError message={fieldErrors.dnsTarget} />
+                                    </div>
+                                )
+                            ) : (
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium">Upstream</label>
+                                    <div class="flex items-center gap-2">
+                                        <select
+                                            class="rounded-md border bg-transparent px-2 py-1.5 text-sm"
+                                            style={inputStyle}
+                                            value={form.forwardScheme}
+                                            onChange={(event) =>
+                                                create.setField(
+                                                    'forwardScheme',
+                                                    (event.target as HTMLSelectElement).value as ForwardScheme,
+                                                )
+                                            }
+                                        >
+                                            <option value="http">http</option>
+                                            <option value="https">https</option>
+                                        </select>
+                                        <span class="text-[var(--color-muted)]">://</span>
+                                        <input
+                                            class={inputClass}
+                                            style={inputStyle}
+                                            value={form.forwardHost}
+                                            onInput={(event) =>
+                                                create.setField('forwardHost', (event.target as HTMLInputElement).value)
+                                            }
+                                            placeholder="10.0.0.5"
+                                        />
+                                        <span class="text-[var(--color-muted)]">:</span>
+                                        <input
+                                            class="w-24 rounded-md border bg-transparent px-3 py-1.5 text-sm"
+                                            style={inputStyle}
+                                            type="number"
+                                            value={form.forwardPort}
+                                            onInput={(event) =>
+                                                create.setField('forwardPort', (event.target as HTMLInputElement).value)
+                                            }
+                                            placeholder="8080"
+                                        />
+                                    </div>
+                                    <FieldError message={fieldErrors.forwardHost ?? fieldErrors.forwardPort} />
+                                </div>
+                            )}
                         </>
                     ) : null}
 
@@ -470,35 +511,38 @@ export function DomainFormModal({ create }: { create: CreateDomain }) {
                                     class="rounded-md px-3 py-2 text-xs text-[var(--color-muted)]"
                                     style={{ backgroundColor: 'var(--color-surface-2)' }}
                                 >
-                                    ℹ Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM). El SSL usa
-                                    un certificado existente en NPM (elige el wildcard abajo).
+                                    {form.dnsOnly
+                                        ? 'ℹ Solo DNS: el Mikrotik crea una entrada estática hacia la IP destino (pestaña Detalles). Sin proxy host ni SSL.'
+                                        : 'ℹ Privado: el DNS lo gestiona el Mikrotik (entrada estática hacia NPM). El SSL usa un certificado existente en NPM (elige el wildcard abajo).'}
                                 </p>
                             )}
 
-                            <div>
-                                <label class="mb-1 block text-sm font-medium">Certificado SSL</label>
-                                <select
-                                    class={inputClass}
-                                    style={inputStyle}
-                                    value={form.certificateId}
-                                    onChange={(event) =>
-                                        create.setField('certificateId', (event.target as HTMLSelectElement).value)
-                                    }
-                                >
-                                    <option value="new">
-                                        {isPublic ? 'Solicitar uno nuevo (Let’s Encrypt)' : 'Automático (wildcard)'}
-                                    </option>
-                                    {certificates.map((certificate) => (
-                                        <option key={certificate.id} value={String(certificate.id)}>
-                                            {certificate.niceName}
+                            {form.dnsOnly ? null : (
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium">Certificado SSL</label>
+                                    <select
+                                        class={inputClass}
+                                        style={inputStyle}
+                                        value={form.certificateId}
+                                        onChange={(event) =>
+                                            create.setField('certificateId', (event.target as HTMLSelectElement).value)
+                                        }
+                                    >
+                                        <option value="new">
+                                            {isPublic ? 'Solicitar uno nuevo (Let’s Encrypt)' : 'Automático (wildcard)'}
                                         </option>
-                                    ))}
-                                </select>
-                                <p class="mt-1 text-xs text-[var(--color-muted)]">
-                                    Se preselecciona el certificado que cubre el dominio (wildcard *.base o exacto) si
-                                    existe. «Nuevo» emite uno por hostname con Let’s Encrypt (solo público).
-                                </p>
-                            </div>
+                                        {certificates.map((certificate) => (
+                                            <option key={certificate.id} value={String(certificate.id)}>
+                                                {certificate.niceName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p class="mt-1 text-xs text-[var(--color-muted)]">
+                                        Se preselecciona el certificado que cubre el dominio (wildcard *.base o exacto)
+                                        si existe. «Nuevo» emite uno por hostname con Let’s Encrypt (solo público).
+                                    </p>
+                                </div>
+                            )}
                         </>
                     ) : null}
                 </div>

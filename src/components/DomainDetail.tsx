@@ -38,6 +38,8 @@ function toListItem(domain: DomainDetailView, enabledInNpm: boolean): DomainList
         id: domain.id,
         hostname: domain.hostname,
         visibility: domain.visibility,
+        dnsOnly: domain.dnsOnly,
+        dnsTarget: domain.dnsTarget,
         source: domain.source,
         dockerHost: domain.dockerHost,
         sourceRef: domain.sourceRef,
@@ -104,9 +106,12 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
 
     const provider = dnsProviderLabel(domain.visibility)
     const isPublic = domain.visibility === 'public'
-    const upstream = domain.forwardHost
-        ? `${domain.forwardScheme}://${domain.forwardHost}:${domain.forwardPort ?? ''}`
-        : '—'
+    const dnsOnly = domain.dnsOnly
+    const upstream = dnsOnly
+        ? `DNS → ${domain.dnsTarget ?? domain.cfContent ?? '(destino)'}`
+        : domain.forwardHost
+          ? `${domain.forwardScheme}://${domain.forwardHost}:${domain.forwardPort ?? ''}`
+          : '—'
     const row = toListItem(domain, status.enabledInNpm)
     const source = sourceBadge(domain.source, domain.dockerHost, domain.sourceRef)
     const goHome = () => {
@@ -153,9 +158,24 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                         ) : null}
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <StatusBadge state={providerState(status.npm)} provider="NPM" />
+                        {dnsOnly ? (
+                            <span
+                                class="inline-block rounded-full border px-2 py-0.5 text-xs"
+                                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
+                            >
+                                Solo DNS
+                            </span>
+                        ) : (
+                            <StatusBadge state={providerState(status.npm)} provider="NPM" />
+                        )}
                         <StatusBadge state={providerState(status.dns)} provider={provider} />
-                        <ActiveIndicator present={status.npm.present} enabled={status.enabledInNpm} pending={false} />
+                        {dnsOnly ? null : (
+                            <ActiveIndicator
+                                present={status.npm.present}
+                                enabled={status.enabledInNpm}
+                                pending={false}
+                            />
+                        )}
                     </div>
                     <p class="text-xs text-[var(--color-muted)]">
                         Última reconciliación: {fmtDate(domain.lastReconciledAt)}
@@ -166,7 +186,7 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
 
                 <Section title="Estado de sincronización">
                     <div class="flex flex-col gap-3 text-sm">
-                        <ProviderLine label="NPM" check={status.npm} />
+                        {dnsOnly ? null : <ProviderLine label="NPM" check={status.npm} />}
                         <ProviderLine label={`DNS (${provider})`} check={status.dns} />
                         {status.issues.length === 0 ? (
                             <p class="text-xs text-[var(--color-muted)]">Sin incidencias.</p>
@@ -253,6 +273,13 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                             <Field label="Certificado (id NPM)">
                                 {domain.certificateId ?? 'nuevo (Let’s Encrypt)'}
                             </Field>
+                        </dl>
+                    ) : dnsOnly ? (
+                        <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                            <Field label="Entrada Mikrotik">
+                                <span class="font-mono text-xs">A → {domain.dnsTarget ?? '(destino)'}</span>
+                            </Field>
+                            <Field label="Modo">Solo DNS (sin proxy host ni SSL)</Field>
                         </dl>
                     ) : (
                         <p class="text-sm text-[var(--color-muted)]">

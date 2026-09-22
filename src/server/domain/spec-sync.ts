@@ -23,9 +23,11 @@ export interface SpecTrace {
 // Columnas del dominio que gobiernan las specs (para comparar y decidir si hay cambios).
 export interface DesiredColumns {
     visibility: 'public' | 'private'
+    dnsOnly: boolean
+    dnsTarget: string | null
     forwardScheme: 'http' | 'https'
-    forwardHost: string
-    forwardPort: number
+    forwardHost: string | null
+    forwardPort: number | null
     npmOptions: NewDomain['npmOptions']
     customLocations: NewDomain['customLocations']
     advancedConfig: string
@@ -41,13 +43,17 @@ export function desiredFromSpec(
     cfDefaults: { defaultPublicIp: string | null; defaultCname: string | null },
 ): DesiredColumns {
     const isPublic = spec.visibility === 'public'
+    const dnsOnly = spec.dnsOnly ?? false
     const cfRecordType = spec.cfRecordType ?? 'A'
 
     return {
         visibility: spec.visibility,
+        dnsOnly,
+        // El destino privado solo aplica a solo-DNS privado; en el resto es null.
+        dnsTarget: dnsOnly && !isPublic ? (spec.dnsTarget ?? null) : null,
         forwardScheme: spec.forwardScheme,
-        forwardHost: spec.forwardHost,
-        forwardPort: spec.forwardPort,
+        forwardHost: spec.forwardHost ?? null,
+        forwardPort: spec.forwardPort ?? null,
         npmOptions: { ...DEFAULT_NPM_OPTIONS, ...(spec.npmOptions ?? {}) },
         customLocations: spec.customLocations ?? [],
         advancedConfig: spec.advancedConfig ?? '',
@@ -63,6 +69,8 @@ export function desiredFromSpec(
 export function matches(row: Domain, desired: DesiredColumns): boolean {
     return (
         row.visibility === desired.visibility &&
+        row.dnsOnly === desired.dnsOnly &&
+        row.dnsTarget === desired.dnsTarget &&
         row.forwardScheme === desired.forwardScheme &&
         row.forwardHost === desired.forwardHost &&
         row.forwardPort === desired.forwardPort &&
@@ -82,6 +90,8 @@ export function createFromSpec(spec: DomainSpec, desired: DesiredColumns, trace:
     return createDomain({
         hostname: spec.hostname,
         visibility: spec.visibility,
+        dnsOnly: desired.dnsOnly,
+        dnsTarget: desired.dnsTarget ?? undefined,
         forwardScheme: spec.forwardScheme,
         forwardHost: spec.forwardHost,
         forwardPort: spec.forwardPort,
@@ -107,14 +117,21 @@ export async function updateFromSpec(row: Domain, desired: DesiredColumns, trace
         .update(domains)
         .set({
             visibility: desired.visibility,
+            dnsOnly: desired.dnsOnly,
+            dnsTarget: desired.dnsTarget,
             forwardScheme: desired.forwardScheme,
             forwardHost: desired.forwardHost,
             forwardPort: desired.forwardPort,
             npmOptions: desired.npmOptions,
             customLocations: desired.customLocations,
             advancedConfig: desired.advancedConfig,
-            certificateId: desired.certificateId,
-            sslMode: desired.visibility === 'public' && !desired.certificateId ? 'new' : 'wildcard',
+            certificateId: desired.dnsOnly ? null : desired.certificateId,
+            // Solo-DNS no toca NPM/SSL → sslMode null.
+            sslMode: desired.dnsOnly
+                ? null
+                : desired.visibility === 'public' && !desired.certificateId
+                  ? 'new'
+                  : 'wildcard',
             cfRecordType: desired.cfRecordType,
             cfContent: desired.cfContent,
             cfProxied: desired.cfProxied,

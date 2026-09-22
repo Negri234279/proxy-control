@@ -43,6 +43,13 @@
       "when": 1789862808506,
       "tag": "0005_left_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790101422510,
+      "tag": "0006_dns_only",
+      "breakpoints": true
     }
   ]
 }

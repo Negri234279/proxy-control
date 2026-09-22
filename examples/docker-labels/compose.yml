@@ -9,7 +9,8 @@
 #   docker compose -f examples/docker-labels/compose.yml up -d
 #   # …y en el panel: "Descubrir Docker" (o espera al resync del worker)
 #
-# Política v1: TODO explícito en labels (visibility, forward.host y forward.port obligatorios).
+# Política v1: TODO explícito en labels (visibility, forward.host y forward.port obligatorios,
+# salvo en dns-only: ver el bloque "Solo DNS" más abajo).
 # forward.host debe ser alcanzable DESDE NPM. Aquí usamos el nombre del container publicado en
 # una red que NPM también comparta; ajústalo a tu topología (IP del host, otra red, etc.).
 # ─────────────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ services:
             - proxy-control.forward.port=80
             # ── Opcionales ──
             - proxy-control.forward.scheme=http # default http
+            # Solo DNS (sin proxy host en NPM): dns-only=true + address (privado). Ver "Ejemplo 2" abajo.
             # Certificado NPM existente por id (si se omite: público → cert nuevo LE; privado → wildcard).
             # - proxy-control.ssl.certificate-id=15
             # Cloudflare (solo público): zona, tipo de registro, contenido y proxied.
@@ -66,6 +68,33 @@ services:
             # - proxy-control.location[0].advanced-config=proxy_read_timeout 3600s;
         networks: [proxy-control-net]
         restart: unless-stopped
+
+    # ─────────────────────────────────────────────────────────────
+    # Ejemplo 2: SOLO DNS (sin proxy host en NPM). Descomenta para probarlo.
+    #
+    # Con dns-only, proxy-control registra ÚNICAMENTE la resolución del hostname y NO crea
+    # proxy host en NPM (sin SSL, sin upstream). Útil para que un hostname resuelva directo
+    # al servicio sin proxificarlo.
+    #
+    #   · PRIVADO → crea SOLO la entrada A estática en el Mikrotik hacia `address` (IP destino,
+    #     obligatoria). `forward.*` no se usa.
+    #   · PÚBLICO → crea SOLO el registro en Cloudflare hacia `cf.content` (obligatorio);
+    #     usa `cf.proxied=false` para un registro gris (DNS-only) que apunte directo al origen.
+    # ─────────────────────────────────────────────────────────────
+    # demo-dns-only:
+    #     image: nginx:1.27-alpine
+    #     container_name: demo-dns-only
+    #     labels:
+    #         - proxy-control.enable=true
+    #         - proxy-control.hostname=nas.negri.es
+    #         - proxy-control.visibility=private
+    #         # ── Solo DNS ──
+    #         - proxy-control.dns-only=true
+    #         # IP a la que resolverá el hostname (entrada A estática del Mikrotik). Obligatoria
+    #         # en dns-only privado. En dns-only público se usa proxy-control.cf.content en su lugar.
+    #         - proxy-control.address=192.168.1.20
+    #     networks: [proxy-control-net]
+    #     restart: unless-stopped
 
 networks:
     # Reutiliza la red del stack de dev para que proxy-control/NPM alcancen al container por

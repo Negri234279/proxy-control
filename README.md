@@ -142,17 +142,19 @@ Semantics:
 ### Label reference
 
 Policy (v1): **everything explicit** — `visibility`, `forward.host` and `forward.port` are
-required, no inference. One hostname per container. The prefix (`proxy-control` by default) is
-configurable via `DOCKER_LABEL_PREFIX`.
+required, no inference (except in `dns-only`, see below). One hostname per container. The prefix
+(`proxy-control` by default) is configurable via `DOCKER_LABEL_PREFIX`.
 
 | Label (under `<prefix>.`)       | Required | Values / notes                                   |
 | :------------------------------ | :------: | :----------------------------------------------- |
 | `enable`                        |    ✅     | `true` — gate; without it the container is ignored |
 | `hostname`                      |    ✅     | e.g. `app.domain.es`                             |
 | `visibility`                    |    ✅     | `public` \| `private`                            |
-| `forward.host`                  |    ✅     | upstream host reachable **from NPM**             |
-| `forward.port`                  |    ✅     | `1`–`65535`                                       |
+| `forward.host`                  |   ✅¹     | upstream host reachable **from NPM**             |
+| `forward.port`                  |   ✅¹     | `1`–`65535`                                       |
 | `forward.scheme`                |          | `http` \| `https` (default `http`)               |
+| `dns-only`                      |          | `true` — register DNS only, **no NPM proxy host** (no SSL/upstream) |
+| `address`                       |   ✅²     | target IPv4 for the Mikrotik static A record (`dns-only` private) |
 | `ssl.certificate-id`            |          | numeric id of an existing NPM certificate        |
 | `cf.zone-id`                    |          | Cloudflare zone (public); else provider default  |
 | `cf.record-type`                |          | `A` \| `CNAME`                                    |
@@ -177,6 +179,11 @@ configurable via `DOCKER_LABEL_PREFIX`.
 | `forward.port`                        |    ✅     | `1`–`65535`                          |
 | `forward.scheme`                      |          | `http` \| `https` (default `http`)   |
 | `advanced-config`                     |          | raw nginx config for this location   |
+
+¹ Not required when `dns-only=true` (there is no proxy host). ² In `dns-only` **private**,
+`address` is the IP the hostname resolves to; in `dns-only` **public** the target is
+`cf.content` instead (required). `dns-only` registers only the DNS record (Cloudflare for
+public, Mikrotik for private) and skips NPM entirely.
 
 Omitted NPM flags fall back to the app defaults (all protections on). See a full example in
 [`examples/docker-labels/compose.yml`](./examples/docker-labels/compose.yml).
@@ -225,13 +232,24 @@ domains:
       visibility: public
       forward: { scheme: http, host: 10.0.0.5, port: 8080 }
       cloudflare: { recordType: A, content: 203.0.113.10, proxied: true }
+    - hostname: nas.negri.es # DNS only (private): Mikrotik A record, no NPM proxy host
+      visibility: private
+      dnsOnly: true
+      address: 192.168.1.20 # IPv4 the hostname resolves to (required)
+    - hostname: cdn.negri.es # DNS only (public): Cloudflare record only, no proxy/SSL
+      visibility: public
+      dnsOnly: true
+      cloudflare: { recordType: A, content: 203.0.113.5, proxied: false } # content required
 ```
 
 Per-entry fields: `hostname`, `visibility` (`public`|`private`), `forward.{scheme,host,port}`
-(required `host`/`port`), optional `ssl.certificateId`, `advancedConfig`, `npm.{blockExploits,
-websockets,cacheAssets,http2,hsts,hstsSubdomains,forceSsl,trustForwardedProto}`, `locations[]`
-(`path` + `forward.{scheme,host,port}` + `advancedConfig`), and `cloudflare.{recordType,content,
-proxied,zoneId}` (public only). Unknown keys are rejected; a bad entry is skipped and reported
+(required `host`/`port`, **except when `dnsOnly: true`**), optional `ssl.certificateId`,
+`advancedConfig`, `npm.{blockExploits,websockets,cacheAssets,http2,hsts,hstsSubdomains,forceSsl,
+trustForwardedProto}`, `locations[]` (`path` + `forward.{scheme,host,port}` + `advancedConfig`),
+and `cloudflare.{recordType,content,proxied,zoneId}` (public only). **`dnsOnly: true`** registers
+only the DNS record and skips NPM (no proxy host, SSL or upstream): private uses `address` (target
+IPv4, required); public uses `cloudflare.content` (required). Unknown keys are rejected; a bad
+entry is skipped and reported
 without failing the rest of the file. Template: [`infra/prod/domains.d/panels.yaml.example`](./infra/prod/domains.d/panels.yaml.example).
 
 ### File-discovery environment variables

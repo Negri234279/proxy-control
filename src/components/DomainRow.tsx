@@ -23,6 +23,11 @@ interface Props {
 }
 
 function upstreamText(row: DomainListItem): string {
+    // Solo DNS: no hay upstream; muestra a dónde resuelve (destino privado o contenido CF).
+    if (row.dnsOnly) {
+        const target = row.dnsTarget ?? row.cfContent
+        return target ? `DNS → ${target}` : 'solo DNS'
+    }
     if (!row.forwardHost) {
         return '—'
     }
@@ -120,7 +125,13 @@ export function DomainRow(props: Props) {
                     <VisibilityPill visibility={row.visibility} />
                 </td>
                 <td class="px-3 py-3">
-                    <StatusBadge state={isUnclassified ? 'unclassified' : npmState} />
+                    {row.dnsOnly ? (
+                        <span class="text-[var(--color-neutral)]" title="Solo DNS: sin proxy host en NPM">
+                            —
+                        </span>
+                    ) : (
+                        <StatusBadge state={isUnclassified ? 'unclassified' : npmState} />
+                    )}
                 </td>
                 <td class="px-3 py-3">
                     {isUnclassified ? (

@@ -16,6 +16,10 @@ export type FormMode = 'add' | 'classify' | 'edit'
 export interface DomainForm {
     hostname: string
     visibility: 'public' | 'private'
+    // Solo DNS: registra la resolución sin proxy host en NPM.
+    dnsOnly: boolean
+    // Destino del A estático del Mikrotik en solo-DNS privado.
+    dnsTarget: string
     forwardScheme: ForwardScheme
     forwardHost: string
     forwardPort: string
@@ -34,6 +38,8 @@ export interface DomainForm {
 const emptyForm = (): DomainForm => ({
     hostname: '',
     visibility: 'public',
+    dnsOnly: false,
+    dnsTarget: '',
     forwardScheme: 'http',
     forwardHost: '',
     forwardPort: '',
@@ -101,6 +107,8 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             ...emptyForm(),
             hostname: row.hostname,
             visibility: row.visibility === 'private' ? 'private' : 'public',
+            dnsOnly: row.dnsOnly,
+            dnsTarget: row.dnsTarget ?? '',
             forwardScheme: row.forwardScheme ?? 'http',
             forwardHost: row.forwardHost ?? '',
             forwardPort: row.forwardPort ? String(row.forwardPort) : '',
@@ -165,16 +173,27 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
             if (mode === 'edit' && editingId) {
                 const body: UpdateDomainBody = {
                     visibility: form.visibility,
-                    forwardScheme: form.forwardScheme,
-                    forwardHost: form.forwardHost,
-                    forwardPort: Number(form.forwardPort),
-                    npmOptions: form.npmOptions,
-                    customLocations: form.customLocations,
-                    advancedConfig: form.advancedConfig,
+                    dnsOnly: form.dnsOnly,
+                }
+
+                // Solo-DNS: sin upstream ni opciones/SSL de NPM.
+                if (!form.dnsOnly) {
+                    body.forwardScheme = form.forwardScheme
+                    body.forwardHost = form.forwardHost
+                    body.forwardPort = Number(form.forwardPort)
+                    body.npmOptions = form.npmOptions
+                    body.customLocations = form.customLocations
+                    body.advancedConfig = form.advancedConfig
+                }
+
+                if (form.dnsOnly && form.visibility === 'private') {
+                    body.dnsTarget = form.dnsTarget
                 }
 
                 if (form.visibility === 'public') {
-                    body.certificateId = form.certificateId === 'new' ? null : Number(form.certificateId)
+                    if (!form.dnsOnly) {
+                        body.certificateId = form.certificateId === 'new' ? null : Number(form.certificateId)
+                    }
                     body.cfRecordType = form.cfRecordType
                     body.cfContent = form.cfContent || null
                     body.cfProxied = form.cfProxied
@@ -190,11 +209,19 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                     hostname: form.hostname,
                     visibility: form.visibility,
                     forwardScheme: form.forwardScheme,
-                    forwardHost: form.forwardHost,
-                    forwardPort: Number(form.forwardPort),
-                    npmOptions: form.npmOptions,
-                    customLocations: form.customLocations,
-                    advancedConfig: form.advancedConfig,
+                }
+
+                if (form.dnsOnly) {
+                    body.dnsOnly = true
+                    if (form.visibility === 'private') {
+                        body.dnsTarget = form.dnsTarget
+                    }
+                } else {
+                    body.forwardHost = form.forwardHost
+                    body.forwardPort = Number(form.forwardPort)
+                    body.npmOptions = form.npmOptions
+                    body.customLocations = form.customLocations
+                    body.advancedConfig = form.advancedConfig
                 }
 
                 if (form.visibility === 'public') {
@@ -203,7 +230,9 @@ export function useCreateDomain({ refetch, pushToast }: CreateDeps) {
                         body.cfContent = form.cfContent
                     }
                     body.cfProxied = form.cfProxied
-                    body.certificateId = form.certificateId === 'new' ? 'new' : Number(form.certificateId)
+                    if (!form.dnsOnly) {
+                        body.certificateId = form.certificateId === 'new' ? 'new' : Number(form.certificateId)
+                    }
                     if (form.cfZoneId) {
                         body.cfZoneId = form.cfZoneId
                     }

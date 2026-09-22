@@ -35,9 +35,14 @@ const createSchema = z
     .object({
         hostname: z.string().refine(isHostname, 'hostname inválido'),
         visibility: z.enum(['public', 'private']),
+        // Solo DNS: registra la resolución sin crear proxy host en NPM.
+        dnsOnly: z.boolean().optional(),
+        // Destino del A estático del Mikrotik en solo-DNS privado.
+        dnsTarget: z.string().min(1).optional(),
         forwardScheme: z.enum(['http', 'https']),
-        forwardHost: forwardHostSchema,
-        forwardPort: forwardPortSchema,
+        // Upstream opcional aquí: se exige en superRefine solo cuando NO es solo-DNS.
+        forwardHost: forwardHostSchema.optional(),
+        forwardPort: forwardPortSchema.optional(),
         npmOptions: npmOptionsSchema.optional(),
         customLocations: z.array(customLocationSchema).optional(),
         advancedConfig: z.string().optional(),
@@ -49,6 +54,32 @@ const createSchema = z
         cfZoneName: z.string().min(1).optional(),
     })
     .superRefine((value, ctx) => {
+        // Sin solo-DNS hay proxy host: el upstream es obligatorio.
+        if (!value.dnsOnly) {
+            if (!value.forwardHost) {
+                ctx.addIssue({ code: 'custom', path: ['forwardHost'], message: 'requerido' })
+            }
+
+            if (value.forwardPort === undefined) {
+                ctx.addIssue({ code: 'custom', path: ['forwardPort'], message: 'requerido' })
+            }
+        }
+
+        // Solo-DNS privado: el destino (IP del A estático del Mikrotik) es obligatorio.
+        if (value.dnsOnly && value.visibility === 'private') {
+            if (!value.dnsTarget) {
+                ctx.addIssue({ code: 'custom', path: ['dnsTarget'], message: 'requerido (IP destino)' })
+            } else if (!isIpv4(value.dnsTarget)) {
+                ctx.addIssue({ code: 'custom', path: ['dnsTarget'], message: 'debe ser una IPv4' })
+            }
+        }
+
+        // Solo-DNS público: el registro apunta directo al origen, así que el contenido es
+        // obligatorio (no tiene sentido caer al PUBLIC_IP del gateway sin NPM detrás).
+        if (value.dnsOnly && value.visibility === 'public' && !value.cfContent) {
+            ctx.addIssue({ code: 'custom', path: ['cfContent'], message: 'requerido (destino del registro)' })
+        }
+
         // Un registro A público debe apuntar a una IPv4 válida (o dejarse a PUBLIC_IP).
         if (
             value.visibility === 'public' &&
@@ -63,6 +94,8 @@ const createSchema = z
 const updateSchema = z
     .object({
         visibility: z.enum(['public', 'private']).optional(),
+        dnsOnly: z.boolean().optional(),
+        dnsTarget: z.string().min(1).nullable().optional(),
         forwardScheme: z.enum(['http', 'https']).optional(),
         forwardHost: forwardHostSchema.optional(),
         forwardPort: forwardPortSchema.optional(),

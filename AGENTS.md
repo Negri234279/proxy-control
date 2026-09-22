@@ -322,11 +322,26 @@ domains:
       forward: { scheme: http, host: 10.0.0.5, port: 8080 }
       cloudflare: { recordType: A, content: 203.0.113.10, proxied: true }  # solo public
       # opcionales: ssl.certificateId, advancedConfig, locations[] ({path, forward, advancedConfig})
+
+    # Solo DNS (sin proxy host en NPM): registra únicamente la resolución.
+    - hostname: nas.negri.es
+      visibility: private
+      dnsOnly: true                            # sin forward/SSL/opciones NPM
+      address: 192.168.1.20                    # IP destino del A estático del Mikrotik (obligatoria en privado)
+    - hostname: cdn.negri.es
+      visibility: public
+      dnsOnly: true
+      cloudflare: { recordType: A, content: 203.0.113.5, proxied: false }  # content obligatorio (destino)
 ```
 
 Reglas al crear dominios por YAML:
 - **Privado** → resuelve por Mikrotik + cert wildcard existente en NPM (no emite cert nuevo).
   **Público** → registro en Cloudflare + cert nuevo de Let's Encrypt.
+- **`dnsOnly: true`** → solo registra la resolución, **sin crear proxy host en NPM** (sin
+  SSL ni upstream). Privado: la entrada A del Mikrotik apunta a **`address`** (IPv4 obligatoria).
+  Público: el registro Cloudflare apunta a **`cloudflare.content`** (obligatorio); `forward` no
+  se usa. Equivalente en labels Docker: **`proxy-control.dns-only=true`** + **`proxy-control.address=<ip>`**
+  (privado) o `proxy-control.cf.content=<destino>` (público).
 - Claves desconocidas se **rechazan** (schema `strict`); una entrada inválida se salta y se
   reporta sin invalidar el resto del fichero.
 - El fichero es **fuente de verdad**: editar/quitar entradas crea/actualiza/orfana en el

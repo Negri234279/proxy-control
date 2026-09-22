@@ -15,9 +15,14 @@ import { reconcileDomain } from './reconcile-domain'
 export interface CreateDomainInput {
     hostname: string
     visibility: 'public' | 'private'
+    // Solo DNS: registra la resolución (CF/Mikrotik) sin crear proxy host en NPM.
+    dnsOnly?: boolean
+    // Destino del A estático del Mikrotik en solo-DNS privado (IP del servicio real).
+    dnsTarget?: string
     forwardScheme: ForwardScheme
-    forwardHost: string
-    forwardPort: number
+    // Upstream: opcional en solo-DNS (no hay proxy host que lo use).
+    forwardHost?: string
+    forwardPort?: number
     npmOptions?: NpmOptions
     customLocations?: CustomLocation[]
     advancedConfig?: string
@@ -50,9 +55,11 @@ function isUniqueViolation(error: unknown): boolean {
 // la fila queda en 'error' y se devuelve igualmente para reintentar con el botón.
 export async function createDomain(input: CreateDomainInput): Promise<Domain> {
     const isPublic = input.visibility === 'public'
+    const dnsOnly = input.dnsOnly ?? false
     const usesExistingCert = typeof input.certificateId === 'number'
-    // sslMode es informativo: 'new' solo si es público y va a emitir cert nuevo.
-    const sslMode = isPublic && !usesExistingCert ? 'new' : 'wildcard'
+    // sslMode es informativo: 'new' solo si es público con NPM y va a emitir cert nuevo.
+    // Solo-DNS no toca NPM ni SSL → null.
+    const sslMode = dnsOnly ? null : isPublic && !usesExistingCert ? 'new' : 'wildcard'
     // Defaults del proveedor Cloudflare (config en DB): IP para registros A, host para CNAME.
     const cfRecordType = input.cfRecordType ?? 'A'
     const cfDefaults = isPublic ? await getCloudflareDefaults() : { defaultPublicIp: null, defaultCname: null }
@@ -60,14 +67,17 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
     const row: NewDomain = {
         hostname: input.hostname,
         visibility: input.visibility,
+        dnsOnly,
+        dnsTarget: dnsOnly && !isPublic ? (input.dnsTarget ?? null) : null,
         forwardScheme: input.forwardScheme,
-        forwardHost: input.forwardHost,
-        forwardPort: input.forwardPort,
+        forwardHost: input.forwardHost ?? null,
+        forwardPort: input.forwardPort ?? null,
         npmOptions: input.npmOptions ?? DEFAULT_NPM_OPTIONS,
         customLocations: input.customLocations ?? [],
         advancedConfig: input.advancedConfig ?? '',
         // Cert elegido: número = existente; 'new'/undefined = solicitar nuevo (público).
-        certificateId: usesExistingCert ? (input.certificateId as number) : null,
+        // Solo-DNS no usa NPM/SSL.
+        certificateId: !dnsOnly && usesExistingCert ? (input.certificateId as number) : null,
         sslMode,
         cfRecordType,
         cfContent: isPublic ? (input.cfContent ?? cloudflareDefaultContent(cfRecordType, cfDefaults) ?? null) : null,

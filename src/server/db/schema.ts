@@ -41,6 +41,13 @@ export const domains = proxyControl.table('domains', {
     hostname: text('hostname').notNull().unique(),
     visibility: visibilityEnum('visibility').notNull().default('unclassified'),
 
+    // Solo DNS: registra únicamente la resolución (Cloudflare público / Mikrotik privado) y
+    // NO crea proxy host en NPM. En ese modo no hay upstream, SSL ni opciones de NPM.
+    dnsOnly: boolean('dns_only').notNull().default(false),
+    // Destino de la entrada DNS en modo solo-DNS privado (IP a la que apunta el A estático
+    // del Mikrotik, p. ej. la IP real del servicio). Público solo-DNS usa `cf_content`.
+    dnsTarget: text('dns_target'),
+
     // Destino que NPM proxifica.
     forwardScheme: forwardSchemeEnum('forward_scheme').notNull().default('http'),
     forwardHost: text('forward_host'),

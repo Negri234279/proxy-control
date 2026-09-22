@@ -50,6 +50,10 @@ export interface DomainListItem {
     id: string | null
     hostname: string
     visibility: Visibility
+    // Solo DNS: sin proxy host en NPM (solo la resolución CF/Mikrotik).
+    dnsOnly: boolean
+    // Destino del A estático del Mikrotik en solo-DNS privado (null en el resto).
+    dnsTarget: string | null
     // Origen del dominio y, si es 'docker', si su container ya no existe (huérfano).
     source: DomainSource
     // Nombre del daemon (multi-host) del que se descubrió (solo 'docker'; null si legacy).
@@ -120,6 +124,8 @@ export interface DomainDetailView {
     id: string
     hostname: string
     visibility: Visibility
+    dnsOnly: boolean
+    dnsTarget: string | null
     source: DomainSource
     // Nombre del daemon (multi-host) del que se descubrió (solo 'docker'; null si legacy).
     dockerHost: string | null

@@ -49,17 +49,19 @@ async function ensurePublicDns(domain: Domain, updates: Partial<NewDomain>): Pro
 
 async function ensurePrivateDns(domain: Domain, updates: Partial<NewDomain>): Promise<void> {
     const mk = await resolveMikrotik()
+    // Normal: apunta a NPM (la IP interna). Solo-DNS: apunta al destino elegido (servicio real).
+    const address = domain.dnsOnly ? (domain.dnsTarget ?? mk.npmInternalIp) : mk.npmInternalIp
     const entries = await listStaticDns(mk)
     const existing = entries.find((entry) => entry.name === domain.hostname)
 
     if (!existing) {
-        const created = await createStaticDns(mk, { name: domain.hostname, address: mk.npmInternalIp })
+        const created = await createStaticDns(mk, { name: domain.hostname, address })
         updates.mikrotikDnsId = created['.id']
         return
     }
 
-    if (existing.address !== mk.npmInternalIp) {
-        await updateStaticDns(mk, existing['.id'], mk.npmInternalIp)
+    if (existing.address !== address) {
+        await updateStaticDns(mk, existing['.id'], address)
     }
 
     updates.mikrotikDnsId = existing['.id']
@@ -120,7 +122,10 @@ export async function reconcileDomain(id: string): Promise<Domain> {
             await ensurePrivateDns(domain, updates)
         }
 
-        await ensureNpm(domain, updates)
+        // Solo-DNS: no hay proxy host que asegurar en NPM.
+        if (!domain.dnsOnly) {
+            await ensureNpm(domain, updates)
+        }
 
         const [saved] = await db
             .update(domains)
