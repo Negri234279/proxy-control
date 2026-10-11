@@ -13,15 +13,19 @@
 # siblings), the landed compose is rewritten to ./observability so the mounts stay
 # valid under the collapsed layout.
 #
-#   infra/prod/ (minus observability/)         → apps/proxy-control/          (the app stack)
+#   infra/prod/ (minus observability/, domains.d/) → apps/proxy-control/      (the app stack, mirror)
+#   infra/prod/domains.d/                       → apps/proxy-control/domains.d/ (ADITIVO, no prune)
 #   infra/observability/ (minus grafana/)      → apps/proxy-control/observability/ (configs prod mounts)
 #   infra/observability/grafana/dashboards/*.json (except postgresql-9628.json)
 #                                              → core/grafana/dashboards/proxy-control/
 #   infra/observability/grafana/provisioning/datasources/datasources.yaml
 #                                              → core/grafana/provisioning/datasources/proxy-control.yml
 #
-# NOT synced:
+# NOT synced / NEVER pruned:
 #   - real *.env secrets (only *.env.example is tracked / copied).
+#   - pi-infra-owned panels under apps/proxy-control/domains.d/ (e.g. nas.yaml, network.yaml):
+#     domains.d is synced ADDITIVELY (step 1c) and excluded from the destructive mirror, so
+#     configs you create directly in pi-infra are updated-if-present but never deleted.
 #   - the Postgres dashboard (the SHARED Postgres "Databases" dashboard is
 #     core-owned; pi-infra owns it).
 #   - the root docker-compose.yml include line (idempotent; checked + wired).
@@ -38,25 +42,21 @@ log() { printf '[sync] %s\n' "$*"; }
 
 # Mirror a dir (prune files removed at source). Prefer rsync (CI); cp fallback for
 # local runs without rsync. Real *.env secrets are never copied nor pruned. Extra
-# rsync excludes can be passed as trailing args.
+# rsync excludes can be passed as trailing args (rsync protects them from copy AND delete).
 mirror_dir() {
   local src="$1" dst="$2"; shift 2
   mkdir -p "$dst"
   if command -v rsync >/dev/null 2>&1; then
     rsync -a --delete --exclude '*.env' "$@" "$src/" "$dst/"
   else
+    # Fallback ADITIVO: cp copia/actualiza desde el origen pero NUNCA borra ficheros que
+    # solo existan en el destino. No emula el pruning de `rsync --delete` (solo afecta a
+    # runs locales sin rsync; CI tiene rsync y poda). Importante: a diferencia de rsync,
+    # aquí NO borramos los dirs `--exclude` del destino — hacerlo destruiría datos que son
+    # propiedad de pi-infra (p. ej. apps/proxy-control/domains.d/*.yaml).
     cp -r "$src/." "$dst/"
     find "$dst" -type f -name '*.env' ! -name '*.env.example' -delete 2>/dev/null || true
-    # Honor `--exclude '<dir>/'` args by pruning them post-copy (rsync does this
-    # natively). Only directory excludes are supported in the fallback.
-    while [ "$#" -gt 0 ]; do
-      if [ "$1" = "--exclude" ]; then
-        rm -rf "$dst/${2%/}"; shift 2
-      else
-        shift
-      fi
-    done
-    log "  (rsync absent: cp fallback — no stale-file pruning beyond excludes)"
+    log "  (rsync ausente: cp fallback aditivo — sin pruning de ficheros obsoletos)"
   fi
 }
 
@@ -64,14 +64,26 @@ mirror_dir() {
 #    Exclude observability/ so mirroring the app stack never prunes the sibling
 #    obs configs synced in step 2 (rsync protects excluded paths from --delete;
 #    the cp fallback stays correct because step 2 runs AFTER this).
-log "app stack: infra/prod/ → apps/$APP/ (minus observability)"
-mirror_dir "$SRC_ROOT/infra/prod" "$DEST/apps/$APP" --exclude 'observability/'
+log "app stack: infra/prod/ → apps/$APP/ (minus observability, minus domains.d)"
+# domains.d se excluye del mirror DESTRUCTIVO: es propiedad de pi-infra (los panels reales
+# viven allí). Se sincroniza aparte de forma ADITIVA en el paso 1c (no se poda nada).
+mirror_dir "$SRC_ROOT/infra/prod" "$DEST/apps/$APP" --exclude 'observability/' --exclude 'domains.d/'
 
 # 1b) Rewrite the landed compose's obs mounts for the collapsed layout:
 #     ../observability → ./observability (obs now sits beside compose.yml).
 if [ -f "$DEST/apps/$APP/compose.yml" ]; then
   sed -i 's#\.\./observability#./observability#g' "$DEST/apps/$APP/compose.yml"
   log "rewrote ../observability → ./observability in apps/$APP/compose.yml"
+fi
+
+# 1c) domains.d → apps/proxy-control/domains.d  (ADITIVO, sin --delete).
+#     Copia/actualiza lo que exista en infra/prod/domains.d (el panels.yaml.example y
+#     cualquier YAML que SÍ versiones en proxy-control), pero NUNCA borra los panels que
+#     crees directamente en pi-infra (nas.yaml, network.yaml, …): esos son suyos.
+if [ -d "$SRC_ROOT/infra/prod/domains.d" ]; then
+  mkdir -p "$DEST/apps/$APP/domains.d"
+  cp -r "$SRC_ROOT/infra/prod/domains.d/." "$DEST/apps/$APP/domains.d/"
+  log "domains.d: infra/prod/domains.d → apps/$APP/domains.d/ (aditivo; no poda)"
 fi
 
 # 2) Shared obs configs (minus grafana/, which goes to core) → apps/proxy-control/observability/
