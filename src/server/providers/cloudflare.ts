@@ -1,13 +1,11 @@
 import type { CfRecordType } from '../../lib/domain-types'
-import { ProviderError } from '../errors'
-import { fetchJson } from './http'
+import { cfJson } from './cloudflare-http'
 
 // Cliente de Cloudflare (registros DNS de dominios públicos). Sin lógica de negocio ni
 // estado: recibe las credenciales (`token` y, cuando aplica, `zoneId`) por parámetro, para
-// soportar varias zonas/cuentas configuradas desde el panel.
+// soportar varias zonas/cuentas configuradas desde el panel. El transporte HTTP (sobre,
+// token, errores) vive en `cloudflare-http.ts`, compartido con el cliente de Rulesets.
 // Docs: https://developers.cloudflare.com/api/
-
-const BASE = 'https://api.cloudflare.com/client/v4'
 
 // Marca los registros que gestiona esta app en el propio Cloudflare (visible en su UI).
 const MANAGED_COMMENT = 'Creado desde proxy-control'
@@ -36,31 +34,6 @@ export interface CreateRecordInput {
     type: CfRecordType
     content: string
     proxied: boolean
-}
-
-interface CfEnvelope<T> {
-    success: boolean
-    errors: { code: number; message: string }[]
-    result: T
-}
-
-async function cfJson<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
-    const envelope = await fetchJson<CfEnvelope<T>>(`${BASE}${path}`, {
-        ...init,
-        provider: 'cloudflare',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            ...init.headers,
-        },
-    })
-
-    if (!envelope.success) {
-        const detail = envelope.errors.map((error) => `${error.code} ${error.message}`).join('; ')
-        throw new ProviderError('cloudflare', `Cloudflare rechazó la petición: ${detail}`)
-    }
-
-    return envelope.result
 }
 
 // Todas las zonas accesibles con el token (para el selector de zona del formulario).

@@ -50,6 +50,13 @@
       "when": 1790101422510,
       "tag": "0006_dns_only",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791667083992,
+      "tag": "0007_edge_rules",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import type { DomainSpec } from './domain-spec'
+import { edgeBlockSchema } from './edge-rules'
 import { isHostname } from './hostname'
 import { isIpv4 } from './ip'
 
@@ -78,9 +79,19 @@ const entrySchema = z
         locations: z.array(locationSchema).optional(),
         ssl: z.object({ certificateId: z.number().int().positive().optional() }).strict().optional(),
         cloudflare: cloudflareSchema.optional(),
+        edge: edgeBlockSchema.optional(),
     })
     .strict()
     .superRefine((value, ctx) => {
+        // Las reglas de borde solo aplican a dominios públicos y proxied (CF las sirve en el borde).
+        if (value.edge && (value.edge.waf.length > 0 || value.edge.rateLimit.length > 0)) {
+            if (value.visibility !== 'public') {
+                ctx.addIssue({ code: 'custom', path: ['edge'], message: 'solo válido en dominios públicos' })
+            } else if (value.cloudflare?.proxied === false) {
+                ctx.addIssue({ code: 'custom', path: ['edge'], message: 'requiere el dominio proxied en Cloudflare' })
+            }
+        }
+
         // Con proxy host (no solo-DNS), el upstream es obligatorio.
         if (!value.dnsOnly && !value.forward) {
             ctx.addIssue({ code: 'custom', path: ['forward'], message: 'requerido (host/port) salvo en dnsOnly' })
@@ -134,6 +145,9 @@ function toSpec(entry: Entry): DomainSpec {
         ...(entry.cloudflare?.content ? { cfContent: entry.cloudflare.content } : {}),
         ...(entry.cloudflare?.proxied !== undefined ? { cfProxied: entry.cloudflare.proxied } : {}),
         ...(entry.cloudflare?.zoneId ? { cfZoneId: entry.cloudflare.zoneId } : {}),
+        ...(entry.edge && (entry.edge.waf.length > 0 || entry.edge.rateLimit.length > 0)
+            ? { edge: { waf: entry.edge.waf, rateLimit: entry.edge.rateLimit } }
+            : {}),
     }
 }
 

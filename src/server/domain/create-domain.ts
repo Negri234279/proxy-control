@@ -9,6 +9,8 @@ import { db } from '../db/client'
 import { domains, type Domain, type NewDomain } from '../db/schema'
 import { ValidationError } from '../errors'
 import { cloudflareDefaultContent, getCloudflareDefaults } from '../settings/dns-providers'
+import type { EdgeSpec } from '../validation/domain-spec'
+import { writeDesiredEdgeRules } from './edge-sync'
 import { getDomainOrThrow } from './get-domain'
 import { reconcileDomain } from './reconcile-domain'
 
@@ -42,6 +44,8 @@ export interface CreateDomainInput {
     dockerContainerId?: string
     // Ruta del fichero YAML de origen (solo source='file').
     sourceRef?: string
+    // Reglas de borde de Cloudflare (solo público proxied; fuentes declarativas).
+    edge?: EdgeSpec
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -108,6 +112,11 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
         }
 
         throw error
+    }
+
+    // Reglas de borde deseadas (antes de reconciliar: la reconciliación las provisiona en CF).
+    if (input.edge) {
+        await writeDesiredEdgeRules(inserted.id, input.edge)
     }
 
     try {

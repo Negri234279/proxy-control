@@ -6,12 +6,15 @@ interface Props {
     onClose: () => void
     children: ComponentChildren
     footer?: ComponentChildren
+    // Si es false, se ignoran los cierres por Esc / ✕ / backdrop (p. ej. durante una operación
+    // en curso que no debe abandonarse a medias). Por defecto el modal siempre se puede cerrar.
+    canClose?: boolean
 }
 
 // Shell de modal sobre <dialog> nativo: showModal() aporta focus trap, fondo inert,
 // Esc y restauración del foco al cerrar. El <dialog> actúa de overlay transparente y el
 // oscurecido lo pinta ::backdrop; la tarjeta interior conserva el layout (arriba + scroll).
-export function Modal({ title, onClose, children, footer }: Props) {
+export function Modal({ title, onClose, children, footer, canClose = true }: Props) {
     const dialogRef = useRef<HTMLDialogElement>(null)
 
     useEffect(() => {
@@ -29,7 +32,17 @@ export function Modal({ title, onClose, children, footer }: Props) {
         }
     }, [])
 
-    const requestClose = () => dialogRef.current?.close()
+    const requestClose = () => {
+        if (!canClose) return
+        dialogRef.current?.close()
+    }
+
+    // Esc dispara el evento 'cancel' antes de 'close'; si no se puede cerrar, lo vetamos.
+    const onNativeCancel = (event: Event) => {
+        if (!canClose) {
+            event.preventDefault()
+        }
+    }
 
     // Único punto de sincronía: cualquier cierre nativo (Esc, ✕, backdrop, cierre por el
     // padre) emite el evento close y propaga el estado hacia arriba.
@@ -45,6 +58,7 @@ export function Modal({ title, onClose, children, footer }: Props) {
         <dialog
             ref={dialogRef}
             aria-label={title}
+            onCancel={onNativeCancel}
             onClose={onNativeClose}
             class="fixed inset-0 m-0 h-full max-h-none w-full max-w-none overflow-y-auto bg-transparent p-0 backdrop:bg-black/60"
         >

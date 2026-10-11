@@ -145,7 +145,8 @@ Rutas en `src/pages/api/`. Todas devuelven JSON. El mapeo de errores vive en
 | PATCH  | `/api/domains/:id`            | Edita un dominio (tipo, upstream, flags).                          |
 | DELETE | `/api/domains/:id`            | Elimina el dominio (y opcionalmente su registro DNS asociado).     |
 | POST   | `/api/domains/:id/reconcile`  | Reconcilia un dominio (crea/repara lo que falte en CF o Mikrotik). |
-| GET    | `/api/domains/:id/status`     | Estado de sync de un dominio (NPM + CF/Mikrotik).                  |
+| GET    | `/api/domains/:id/status`     | Estado de sync de un dominio (NPM + CF/Mikrotik + reglas de borde).|
+| DELETE | `/api/domains/:id/edge-rules/:ruleId` | Borra una regla de borde de Cloudflare (CF + DB).         |
 | POST   | `/api/reconcile`              | Reconcilia toda la flota.                                          |
 | GET    | `/api/status`                 | Estado de sync de toda la flota (para el polling de la tabla).     |
 | GET    | `/health`                     | Healthcheck (readiness de DB y proveedores).                       |
@@ -332,6 +333,25 @@ domains:
       visibility: public
       dnsOnly: true
       cloudflare: { recordType: A, content: 203.0.113.5, proxied: false }  # content obligatorio (destino)
+
+    # Reglas de borde de Cloudflare (WAF custom + rate limiting). Solo public + proxied.
+    - hostname: otlp.negri.es
+      visibility: public
+      forward: { scheme: http, host: 10.0.0.9, port: 4318 }
+      cloudflare: { recordType: A, content: 203.0.113.10, proxied: true }
+      edge:
+        waf:
+          - description: "solo POST/OPTIONS a /collect"   # description = clave de idempotencia
+            expression: '(not (http.request.method in {"POST" "OPTIONS"})) or (http.request.uri.path ne "/collect")'
+            action: block
+        rateLimit:
+          - description: "rate-limit /collect por IP"
+            expression: 'http.request.uri.path eq "/collect"'
+            requestsPerPeriod: 100
+            period: 60                 # admitidos: 10, 60, 120, 300, 600, 3600
+            mitigationTimeout: 600     # >= period
+            action: block
+            characteristics: [ip.src]  # cf.colo.id se añade siempre (lo exige Cloudflare)
 ```
 
 Reglas al crear dominios por YAML:
@@ -342,6 +362,25 @@ Reglas al crear dominios por YAML:
   Público: el registro Cloudflare apunta a **`cloudflare.content`** (obligatorio); `forward` no
   se usa. Equivalente en labels Docker: **`proxy-control.dns-only=true`** + **`proxy-control.address=<ip>`**
   (privado) o `proxy-control.cf.content=<destino>` (público).
+- **`edge`** (reglas de borde de Cloudflare) → **solo en dominios `public` y proxied** (se rechaza
+  si no). Dos listas: `edge.waf[]` (`{description, expression, action: block}`, fase
+  `http_request_firewall_custom`) y `edge.rateLimit[]` (`{description, expression, requestsPerPeriod,
+  period, mitigationTimeout, action: block, characteristics[]}`, fase `http_ratelimit`).
+  - **Auto-scoping por host**: NO repitas el hostname en la expresión; proxy-control la envuelve
+    como `(http.host eq "<hostname>") and (<tu expresión>)` para acotar la regla al dominio.
+  - **`description` = clave de idempotencia** (dedupe dentro del entrypoint de zona+fase): en el
+    re-sync se reutiliza/actualiza la MISMA regla de Cloudflare, no se duplica. Los ids provisionados
+    (`ruleset_id`/`rule_id`) se guardan en `proxy_control.edge_rules` y reconcilian por referencia.
+  - **`period` ∈ {10,60,120,300,600,3600}**, `mitigationTimeout ≥ period`; `cf.colo.id` se añade
+    siempre a `characteristics` (lo exige Cloudflare); si no declaras ninguna se usa `ip.src`.
+  - **Propiedad/orfandad igual que los dominios**: quitar una regla de la declaración la marca
+    **huérfana** (no se borra de Cloudflare); se conserva hasta un **borrado explícito desde el
+    panel** (detalle del dominio → “Reglas de borde”). Si el dominio pasa a huérfano, sus reglas
+    también. El token de Cloudflare del proveedor DB debe tener permiso **Zone WAF / Zone Rulesets**.
+  - **Equivalente en labels Docker** (estilo indexado como `location[N]`):
+    `proxy-control.edge.waf[0].description=…`, `.expression=…`, `.action=block`;
+    `proxy-control.edge.ratelimit[0].description=…`, `.expression=…`, `.requests-per-period=100`,
+    `.period=60`, `.mitigation-timeout=600`, `.characteristics=ip.src,cf.colo.id`, `.action=block`.
 - Claves desconocidas se **rechazan** (schema `strict`); una entrada inválida se salta y se
   reporta sin invalidar el resto del fichero.
 - El fichero es **fuente de verdad**: editar/quitar entradas crea/actualiza/orfana en el

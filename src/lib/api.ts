@@ -124,6 +124,8 @@ export const api = {
         ),
     deleteDomain: (id: string, removeDns: boolean) =>
         req<{ ok: boolean }>(`/api/domains/${id}${removeDns ? '?removeDns=true' : ''}`, { method: 'DELETE' }),
+    deleteEdgeRule: (domainId: string, ruleId: string) =>
+        req<{ ok: boolean }>(`/api/domains/${domainId}/edge-rules/${ruleId}`, { method: 'DELETE' }),
     reconcileOne: (id: string) =>
         req<{ domain: DomainRecord }>(`/api/domains/${id}/reconcile`, { method: 'POST' }).then((r) => r.domain),
     reconcileAll: () =>

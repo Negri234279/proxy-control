@@ -9,9 +9,11 @@ import type {
 } from '../lib/domain-types'
 import { sourceBadge } from '../lib/domain-source'
 import { NPM_OPTION_LABELS } from '../lib/npm-options'
-import { dnsProviderLabel, stateMeta } from '../lib/reconcile-state'
+import { dnsProviderLabel } from '../lib/reconcile-state'
 import { ActiveIndicator } from './ActiveIndicator'
 import { DomainDetailActions } from './DomainDetailActions'
+import { EdgeRulesSection } from './EdgeRulesSection'
+import { OrphanPill } from './OrphanPill'
 import { StatusBadge } from './StatusBadge'
 import { VisibilityPill } from './VisibilityPill'
 
@@ -147,14 +149,7 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                             </span>
                         ) : null}
                         {domain.orphaned ? (
-                            <span
-                                class="inline-block rounded-full border px-1.5 py-0.5 text-[11px] tracking-wide uppercase"
-                                style={{ borderColor: stateMeta('missing').color, color: stateMeta('missing').color }}
-                                aria-label="Huérfano: el contenedor ya no existe; no se ha borrado, revísalo"
-                                title="El contenedor ya no existe (no se ha borrado; revísalo)"
-                            >
-                                huérfano
-                            </span>
+                            <OrphanPill title="Huérfano: el contenedor ya no existe; no se ha borrado, revísalo" />
                         ) : null}
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -308,6 +303,12 @@ export function DomainDetail({ initial }: { initial: DomainDetailResponse }) {
                         </Field>
                     </dl>
                 </Section>
+
+                {isPublic && domain.cfProxied ? (
+                    <Section title="Reglas de borde (Cloudflare)">
+                        <EdgeRulesSection domainId={domain.id} rules={status.edge} onDeleted={refetch} />
+                    </Section>
+                ) : null}
             </div>
         </div>
     )

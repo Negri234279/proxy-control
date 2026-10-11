@@ -8,6 +8,21 @@ export type SslMode = 'new' | 'wildcard'
 export type CfRecordType = 'A' | 'CNAME'
 export type ReconcileState = 'synced' | 'drift' | 'missing' | 'error'
 
+// Reglas de borde de Cloudflare asociadas a un dominio público proxied.
+export type EdgeRuleKind = 'waf' | 'ratelimit'
+
+// Periodos admitidos por el rate limiting de Cloudflare (segundos).
+export const EDGE_RATE_LIMIT_PERIODS = [10, 60, 120, 300, 600, 3600] as const
+export type EdgeRateLimitPeriod = (typeof EDGE_RATE_LIMIT_PERIODS)[number]
+
+// Config específica de la regla (JSONB en DB). WAF → vacío; rate-limit → sus parámetros.
+export interface EdgeRuleConfig {
+    requestsPerPeriod?: number
+    period?: number
+    mitigationTimeout?: number
+    characteristics?: string[]
+}
+
 // Opciones del proxy host de NPM (mapeadas a los campos reales de su API en el provider).
 export interface NpmOptions {
     blockExploits: boolean // block_exploits
@@ -110,6 +125,23 @@ export interface ProviderCheckView {
     reasons?: string[]
 }
 
+// Estado en vivo de una regla de borde (Cloudflare Rulesets) para su badge en el detalle.
+export interface EdgeRuleView {
+    id: string
+    kind: EdgeRuleKind
+    description: string
+    expression: string
+    action: string
+    config: EdgeRuleConfig
+    ruleId: string | null
+    orphaned: boolean
+    // Estado por proveedor, derivado del chequeo en vivo contra el ruleset de Cloudflare.
+    state: ReconcileState
+    present: boolean
+    drift: boolean
+    reasons?: string[]
+}
+
 // Diff en vivo de un dominio (GET /api/domains/:id/status).
 export interface DomainDiffView {
     state: ReconcileState
@@ -117,6 +149,8 @@ export interface DomainDiffView {
     dns: ProviderCheckView
     enabledInNpm: boolean
     issues: string[]
+    // Reglas de borde en vivo (solo dominios públicos proxied; vacío en el resto).
+    edge: EdgeRuleView[]
 }
 
 // Fila completa de un dominio para la página de detalle (fechas como ISO strings tras JSON).

@@ -1,5 +1,6 @@
-import type { CustomLocation, ReconcileState } from '../../lib/domain-types'
+import type { CustomLocation, EdgeRuleView, ReconcileState } from '../../lib/domain-types'
 import type { Domain } from '../db/schema'
+import { edgeRuleViews } from '../domain/edge-sync'
 import { findRecord, listRecords, type CfDnsRecord } from '../providers/cloudflare'
 import { listStaticDns, type MikrotikDnsEntry } from '../providers/mikrotik'
 import { isProxyHostEnabled, listProxyHosts, type NpmProxyHost, type NpmProxyHostLocation } from '../providers/npm'
@@ -23,6 +24,8 @@ export interface DomainDiff {
     dns: ProviderCheck
     enabledInNpm: boolean
     issues: string[]
+    // Reglas de borde de Cloudflare en vivo (solo público proxied; vacío en el resto).
+    edge: EdgeRuleView[]
 }
 
 // NPM devuelve estos flags como boolean (v2.15) o como 0/1 según versión: toleramos ambos.
@@ -281,12 +284,23 @@ export async function diff(domain: Domain): Promise<DomainDiff> {
         issues.push(`DNS: ${dns.detail}`)
     }
 
+    // Reglas de borde en vivo (solo público proxied). Un fallo de Cloudflare no rompe el resto.
+    let edge: EdgeRuleView[] = []
+    if (domain.visibility === 'public' && domain.cfProxied) {
+        try {
+            edge = await edgeRuleViews(domain)
+        } catch (error) {
+            issues.push(`Edge: ${(error as Error).message}`)
+        }
+    }
+
     return {
         state: resolveState({ errored, npm, dns, dnsOnly: domain.dnsOnly }),
         npm,
         dns,
         enabledInNpm,
         issues,
+        edge,
     }
 }
 

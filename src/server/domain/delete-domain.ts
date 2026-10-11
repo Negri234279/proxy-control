@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db/client'
-import { domains } from '../db/schema'
+import { domains, edgeRules } from '../db/schema'
 import { deleteRecord } from '../providers/cloudflare'
 import { deleteStaticDns } from '../providers/mikrotik'
 import { deleteProxyHost } from '../providers/npm'
 import { cloudflareApiForDomain, resolveMikrotik } from '../settings/dns-providers'
+import { removeEdgeRuleInCf } from './edge-sync'
 import { getDomainOrThrow } from './get-domain'
 
 interface DeleteOptions {
@@ -28,6 +29,12 @@ export async function deleteDomain(id: string, options: DeleteOptions = {}): Pro
             await cloudflareApiForDomain(domain)
                 .then((api) => deleteRecord(api, recordId))
                 .catch(() => undefined)
+
+            // Limpia también las reglas de borde provisionadas en Cloudflare (best-effort).
+            const rules = await db.select().from(edgeRules).where(eq(edgeRules.domainId, domain.id))
+            for (const rule of rules) {
+                await removeEdgeRuleInCf(domain, rule)
+            }
         }
 
         if (domain.visibility === 'private' && domain.mikrotikDnsId) {

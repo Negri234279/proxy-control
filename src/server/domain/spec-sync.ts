@@ -3,8 +3,9 @@ import { DEFAULT_NPM_OPTIONS } from '../../lib/domain-types'
 import { db } from '../db/client'
 import { domains, type Domain, type NewDomain } from '../db/schema'
 import { cloudflareDefaultContent } from '../settings/dns-providers'
-import type { DomainSpec } from '../validation/domain-spec'
+import type { DomainSpec, EdgeSpec } from '../validation/domain-spec'
 import { createDomain } from './create-domain'
+import { writeDesiredEdgeRules } from './edge-sync'
 import { reconcileDomain } from './reconcile-domain'
 
 // Motor compartido "spec → dominio" para las fuentes declarativas (Docker labels, fichero YAML).
@@ -107,12 +108,19 @@ export function createFromSpec(spec: DomainSpec, desired: DesiredColumns, trace:
         dockerHost: trace.dockerHost ?? undefined,
         dockerContainerId: trace.dockerContainerId ?? undefined,
         sourceRef: trace.sourceRef ?? undefined,
+        edge: spec.edge,
     })
 }
 
 // Actualiza una fila existente para que coincida con la spec y la re-reconcilia. Al cambiar de
-// tipo, limpia los ids del proveedor antiguo para no dejar basura.
-export async function updateFromSpec(row: Domain, desired: DesiredColumns, trace: SpecTrace): Promise<void> {
+// tipo, limpia los ids del proveedor antiguo para no dejar basura. Las reglas de borde deseadas
+// se escriben antes de reconciliar (la reconciliación las provisiona en Cloudflare).
+export async function updateFromSpec(
+    row: Domain,
+    desired: DesiredColumns,
+    trace: SpecTrace,
+    edge: EdgeSpec | undefined,
+): Promise<void> {
     await db
         .update(domains)
         .set({
@@ -147,5 +155,6 @@ export async function updateFromSpec(row: Domain, desired: DesiredColumns, trace
         })
         .where(eq(domains.id, row.id))
 
+    await writeDesiredEdgeRules(row.id, edge)
     await reconcileDomain(row.id)
 }

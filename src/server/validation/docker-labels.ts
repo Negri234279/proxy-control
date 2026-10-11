@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import type { CustomLocation, NpmOptions } from '../../lib/domain-types'
 import { ValidationError } from '../errors'
-import type { DomainSpec } from './domain-spec'
+import type { DomainSpec, EdgeSpec } from './domain-spec'
+import { edgeRateLimitEntrySchema, edgeWafEntrySchema } from './edge-rules'
 import { isHostname } from './hostname'
 import { isIpv4 } from './ip'
 
@@ -144,6 +145,78 @@ function parseLocations(
     return locations
 }
 
+// Índices declarados para una clave indexada `<base>[N].` (ordenados ascendentemente).
+function collectIndices(labels: Record<string, string>, re: RegExp): number[] {
+    const indices = new Set<number>()
+    for (const key of Object.keys(labels)) {
+        const match = key.match(re)
+        if (match) {
+            indices.add(Number(match[1]))
+        }
+    }
+
+    return [...indices].sort((a, b) => a - b)
+}
+
+// Reglas de borde declaradas por labels indexadas:
+//   <prefix>.edge.waf[N].description / .expression / .action
+//   <prefix>.edge.ratelimit[N].description / .expression / .requests-per-period / .period /
+//     .mitigation-timeout / .characteristics (CSV) / .action
+function parseEdge(labels: Record<string, string>, prefix: string, hostname: string): EdgeSpec | undefined {
+    const wafRe = new RegExp(`^${escapeRegExp(prefix)}\\.edge\\.waf\\[(\\d+)\\]\\.`)
+    const rlRe = new RegExp(`^${escapeRegExp(prefix)}\\.edge\\.ratelimit\\[(\\d+)\\]\\.`)
+    const wafIndices = collectIndices(labels, wafRe)
+    const rlIndices = collectIndices(labels, rlRe)
+
+    if (wafIndices.length === 0 && rlIndices.length === 0) {
+        return undefined
+    }
+
+    const waf: EdgeSpec['waf'] = []
+    for (const index of wafIndices) {
+        const base = `${prefix}.edge.waf[${index}]`
+        const result = edgeWafEntrySchema.safeParse({
+            description: labels[`${base}.description`],
+            expression: labels[`${base}.expression`],
+            action: labels[`${base}.action`],
+        })
+
+        if (!result.success) {
+            throw toValidationError(result.error, hostname, `edge.waf[${index}].`)
+        }
+
+        waf.push(result.data)
+    }
+
+    const rateLimit: EdgeSpec['rateLimit'] = []
+    for (const index of rlIndices) {
+        const base = `${prefix}.edge.ratelimit[${index}]`
+        const rawCharacteristics = labels[`${base}.characteristics`]
+        const result = edgeRateLimitEntrySchema.safeParse({
+            description: labels[`${base}.description`],
+            expression: labels[`${base}.expression`],
+            requestsPerPeriod: labels[`${base}.requests-per-period`],
+            period: labels[`${base}.period`],
+            mitigationTimeout: labels[`${base}.mitigation-timeout`],
+            action: labels[`${base}.action`],
+            characteristics: rawCharacteristics
+                ? rawCharacteristics
+                      .split(',')
+                      .map((value) => value.trim())
+                      .filter(Boolean)
+                : undefined,
+        })
+
+        if (!result.success) {
+            throw toValidationError(result.error, hostname, `edge.ratelimit[${index}].`)
+        }
+
+        rateLimit.push(result.data)
+    }
+
+    return { waf, rateLimit }
+}
+
 function parseNpmOptions(labels: Record<string, string>, prefix: string): Partial<NpmOptions> | undefined {
     const options: Partial<NpmOptions> = {}
 
@@ -192,11 +265,28 @@ export function parseContainerLabels(labels: Record<string, string>, prefix: str
     const npmOptions = parseNpmOptions(labels, prefix)
     const customLocations = parseLocations(labels, prefix, hostname)
     const advancedConfig = labels[`${prefix}.advanced-config`]
+    const edge = parseEdge(labels, prefix, hostname)
+
+    // Las reglas de borde solo aplican a dominios públicos y proxied (CF las sirve en el borde).
+    if (edge) {
+        if (result.data.visibility !== 'public') {
+            throw new ValidationError(`Labels de Docker inválidas para ${hostname}`, {
+                edge: 'solo válido en dominios públicos',
+            })
+        }
+
+        if (result.data.cfProxied === false) {
+            throw new ValidationError(`Labels de Docker inválidas para ${hostname}`, {
+                edge: 'requiere el dominio proxied en Cloudflare',
+            })
+        }
+    }
 
     return {
         ...result.data,
         ...(npmOptions ? { npmOptions } : {}),
         ...(customLocations ? { customLocations } : {}),
         ...(advancedConfig !== undefined ? { advancedConfig } : {}),
+        ...(edge ? { edge } : {}),
     }
 }

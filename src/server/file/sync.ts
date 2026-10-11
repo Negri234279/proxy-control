@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import type { SyncSummary } from '../../lib/discovery'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
+import { edgeRulesMatch } from '../domain/edge-sync'
 import { createFromSpec, desiredFromSpec, matches, updateFromSpec } from '../domain/spec-sync'
 import { logger } from '../observability/logger'
 import { getCloudflareDefaults } from '../settings/dns-providers'
@@ -73,13 +74,14 @@ export async function syncFromFile(): Promise<SyncSummary> {
                 matches(existing, desired) &&
                 existing.reconcileState === 'synced' &&
                 !existing.orphanedAt &&
-                existing.sourceRef === file
+                existing.sourceRef === file &&
+                (await edgeRulesMatch(existing.id, spec.edge))
             ) {
                 summary.unchanged += 1
                 continue
             }
 
-            await updateFromSpec(existing, desired, trace)
+            await updateFromSpec(existing, desired, trace, spec.edge)
             summary.updated += 1
         } catch (error) {
             summary.errors.push({ hostname: spec.hostname, error: (error as Error).message })

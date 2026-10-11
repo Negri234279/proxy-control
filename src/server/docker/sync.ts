@@ -3,6 +3,7 @@ import type { DockerSyncSummary } from '../../lib/docker'
 import { env } from '../config/env'
 import { db } from '../db/client'
 import { domains } from '../db/schema'
+import { edgeRulesMatch } from '../domain/edge-sync'
 import { createFromSpec, desiredFromSpec, matches, updateFromSpec } from '../domain/spec-sync'
 import { logger } from '../observability/logger'
 import { listContainers, type DockerContainer } from '../providers/docker'
@@ -101,7 +102,8 @@ export async function syncFromDocker(): Promise<DockerSyncSummary> {
                 matches(existing, desired) &&
                 existing.reconcileState === 'synced' &&
                 !existing.orphanedAt &&
-                existing.dockerHost === host
+                existing.dockerHost === host &&
+                (await edgeRulesMatch(existing.id, spec.edge))
             ) {
                 // Ya coincide: solo refresca el id del container si cambió.
                 if (existing.dockerContainerId !== container.Id) {
@@ -111,7 +113,7 @@ export async function syncFromDocker(): Promise<DockerSyncSummary> {
                 continue
             }
 
-            await updateFromSpec(existing, desired, trace)
+            await updateFromSpec(existing, desired, trace, spec.edge)
             summary.updated += 1
         } catch (error) {
             summary.errors.push({ hostname: spec.hostname, error: (error as Error).message })

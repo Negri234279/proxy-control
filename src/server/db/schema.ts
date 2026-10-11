@@ -1,5 +1,5 @@
 import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core'
-import { DEFAULT_NPM_OPTIONS, type CustomLocation, type NpmOptions } from '../../lib/domain-types'
+import { DEFAULT_NPM_OPTIONS, type CustomLocation, type EdgeRuleConfig, type NpmOptions } from '../../lib/domain-types'
 
 // Esquema propio de la app. Al declararlo con pgSchema, Drizzle cualifica todas las
 // tablas como `proxy_control.<tabla>`, así que las queries NO dependen del search_path
@@ -14,6 +14,8 @@ export const reconcileStateEnum = proxyControl.enum('reconcile_state', ['synced'
 export const dnsProviderScopeEnum = proxyControl.enum('dns_provider_scope', ['public', 'private'])
 // Origen del dominio: alta manual (panel), labels de Docker o fichero YAML declarativo.
 export const domainSourceEnum = proxyControl.enum('domain_source', ['manual', 'docker', 'file'])
+// Tipo de regla de borde de Cloudflare: WAF custom (firewall) o rate limiting.
+export const edgeRuleKindEnum = proxyControl.enum('edge_rule_kind', ['waf', 'ratelimit'])
 
 // Proveedores DNS configurables (editables por panel). Modelo genérico: `kind` decide el
 // cliente (cloudflare, mikrotik, …), `scope` si resuelve dominios públicos o privados,
@@ -103,3 +105,41 @@ export const domains = proxyControl.table('domains', {
 
 export type Domain = typeof domains.$inferSelect
 export type NewDomain = typeof domains.$inferInsert
+
+// Reglas de borde de Cloudflare (WAF custom + rate limiting) de un dominio público proxied.
+// Igual que `domains`, una fila lleva el estado DESEADO (kind/description/expression/config) y
+// el OBSERVADO (ruleset_id/rule_id provisionados en CF + reconcile_state) para reconciliar por
+// referencia. `description` es la clave de dedupe dentro del entrypoint de zona+fase. La regla
+// hereda la propiedad/orfandad de su dominio (FK cascade); `orphaned_at` marca una declaración
+// retirada que NO se borra (se conserva en CF hasta un borrado explícito desde la UI).
+export const edgeRules = proxyControl.table('edge_rules', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    domainId: uuid('domain_id')
+        .notNull()
+        .references(() => domains.id, { onDelete: 'cascade' }),
+    kind: edgeRuleKindEnum('kind').notNull(),
+    // Clave de dedupe/idempotencia dentro del entrypoint de zona+fase de Cloudflare.
+    description: text('description').notNull(),
+    // Expresión del usuario (sin scoping de host; se envuelve al reconciliar).
+    expression: text('expression').notNull(),
+    action: text('action').notNull().default('block'),
+    // Parámetros de rate limiting (vacío en WAF).
+    config: jsonb('config').$type<EdgeRuleConfig>().notNull().default({}),
+
+    // Referencias provisionadas en Cloudflare (para reconciliar create/update/delete).
+    rulesetId: text('ruleset_id'),
+    ruleId: text('rule_id'),
+
+    orphanedAt: timestamp('orphaned_at', { withTimezone: true }),
+    reconcileState: reconcileStateEnum('reconcile_state').notNull().default('missing'),
+    lastReconciledAt: timestamp('last_reconciled_at', { withTimezone: true }),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+})
+
+export type EdgeRule = typeof edgeRules.$inferSelect
+export type NewEdgeRule = typeof edgeRules.$inferInsert

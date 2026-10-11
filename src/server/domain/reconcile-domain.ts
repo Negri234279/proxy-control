@@ -10,6 +10,7 @@ import { reconcileCounter } from '../observability/metrics'
 import { createProxyHost, listProxyHosts, updateProxyHost } from '../providers/npm'
 import { resolveCloudflare, resolveMikrotik } from '../settings/dns-providers'
 import { desiredCertificateId, desiredCfRecord, desiredProxyHostInput } from './desired'
+import { ensureEdgeRules } from './edge-sync'
 import { getDomainOrThrow } from './get-domain'
 
 // Reconcilia un dominio: asegura que existan (y coincidan) sus recursos en cada
@@ -126,6 +127,9 @@ export async function reconcileDomain(id: string): Promise<Domain> {
         if (!domain.dnsOnly) {
             await ensureNpm(domain, updates)
         }
+
+        // Reglas de borde de Cloudflare (solo público proxied; no-op si el dominio no tiene).
+        await ensureEdgeRules(domain)
 
         const [saved] = await db
             .update(domains)
