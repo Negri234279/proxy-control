@@ -1,0 +1,7 @@
+# Dominios de test dev-only: viven solo en tu máquina (llevan tu IP/hostnames reales y
+# tocan el Cloudflare/Mikrotik de prod). NO se commitean ni se espejan a pi-infra.
+# Se versiona solo la plantilla (*.example) y este .gitignore.
+*.yaml
+*.yml
+!.gitignore
+!*.example

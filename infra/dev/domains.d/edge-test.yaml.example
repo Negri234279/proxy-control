@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Banco de pruebas DEV para las reglas de borde (WAF + rate limiting) y demás features.
+#
+# Credenciales: dev usa las MISMAS de prod (Cloudflare/Mikrotik), porque no hay otra
+# cuenta/router. El aislamiento NO es por credenciales: es por HOSTNAME. Todo lo que hace
+# proxy-control va clavado al hostname (registro CF, entrada Mikrotik, proxy host NPM) y las
+# reglas de borde van auto-scopeadas `(http.host eq "<hostname>")`, así que un subdominio
+# desechable que prod NO gestione se comporta como un sandbox dentro de los sistemas reales.
+# Además proxy-control NUNCA borra recursos remotos solo (solo borrado explícito desde panel).
+#
+# Cómo usarlo:
+#   1) Copia este fichero a `edge-test.yaml` (sin `.example`) en esta misma carpeta.
+#   2) Cambia `pc-dev-edge.TU-ZONA` por un subdominio REAL de tu zona que prod no use, y
+#      `TU-IP-PUBLICA` por tu IP pública (la misma que usa prod para registros A).
+#   3) En `infra/dev/.env` pon `FILE_DOMAINS_ENABLED=true`.
+#   4) Arranca el stack dev: `docker compose -f infra/dev/compose.yml --env-file infra/dev/.env up --build`
+#      (o `npm run docker:dev`). El watcher creará el dominio y provisionará las reglas en CF.
+#
+# Qué comprobar:
+#   - En el dashboard de Cloudflare (Security → WAF → Custom rules / Rate limiting) aparecen
+#     dos reglas con descripción `[DEV] …`, scopeadas por `http.host`.
+#   - Re-sync (toca el fichero / reinicia) → NO se duplican.
+#   - Cambia `requestsPerPeriod` → se actualiza la MISMA regla (mismo rule_id).
+#   - Borra una entrada del YAML → la regla queda HUÉRFANA (no se borra de CF).
+#   - En el panel (detalle del dominio → "Reglas de borde") borra una regla → desaparece de CF.
+#
+# Limpieza al terminar: borra el dominio desde el panel con "eliminar DNS" (quita el registro
+# CF y, si fuese privado, la entrada Mikrotik) y borra sus reglas de borde desde la sección.
+# ─────────────────────────────────────────────────────────────────────────────
+
+domains:
+    # Público proxied + solo-DNS: crea SOLO el registro proxied en Cloudflare + las reglas de
+    # borde. Sin proxy host en NPM ni certificado → la huella mínima para probar `edge`.
+    - hostname: pc-dev-edge.TU-ZONA # p. ej. pc-dev-edge.negri.es (subdominio que prod no use)
+      visibility: public
+      dnsOnly: true
+      cloudflare: { recordType: A, content: TU-IP-PUBLICA, proxied: true }
+      edge:
+          waf:
+              - description: '[DEV] solo POST/OPTIONS a /collect'
+                expression: '(not (http.request.method in {"POST" "OPTIONS"})) or (http.request.uri.path ne "/collect")'
+                action: block
+          rateLimit:
+              - description: '[DEV] rate-limit /collect por IP'
+                expression: 'http.request.uri.path eq "/collect"'
+                requestsPerPeriod: 100
+                period: 60 # admitidos: 10, 60, 120, 300, 600, 3600
+                mitigationTimeout: 600 # >= period
+                action: block
+                characteristics: [ip.src] # cf.colo.id se añade siempre (lo exige Cloudflare)
+
+    # (Opcional) Prueba del Mikrotik sin tocar prod: subdominio privado solo-DNS. Crea SOLO una
+    # entrada A estática en el Mikrotik real hacia `address`. Descomenta y ajusta el hostname.
+    # - hostname: pc-dev-priv.TU-ZONA
+    #   visibility: private
+    #   dnsOnly: true
+    #   address: 192.168.1.250        # IP destino de la entrada estática (que prod no use)

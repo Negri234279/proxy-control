@@ -100,8 +100,10 @@ services:
             - ../../.env:/app/.env:ro
             # Socket de Docker (solo lectura): descubrimiento de dominios por labels.
             - /var/run/docker.sock:/var/run/docker.sock:ro
-            # Dominios estáticos por fichero YAML (paneles bare-metal). Edita infra/prod/domains.d.
-            - ../prod/domains.d:/config/domains.d:ro
+            # Dominios estáticos por fichero YAML. En DEV se monta una carpeta PROPIA
+            # (infra/dev/domains.d), NO la de prod: así dev no reconcilia los paneles reales
+            # contra el Cloudflare/Mikrotik de prod. Copia edge-test.yaml.example → *.yaml ahí.
+            - ./domains.d:/config/domains.d:ro
         networks: [proxy-control-net]
         restart: unless-stopped
 
