@@ -414,6 +414,21 @@ astro dev --background
 
 Gestionar el servidor con `astro dev stop`, `astro dev status` y `astro dev logs`.
 
+**Tests unitarios** (Vitest, entorno Node — sin DOM): `npm test` (una pasada) o `npm run test:watch`.
+Cobertura amplia, siempre con mocks (NO tocan proveedores ni DB reales):
+- **Lógica pura**: validación (hostname/ip/domain/dns-provider/edge-rules), parsers de labels/YAML,
+  `reconcile/diff` (checks + `computeFleetState`), mapeos `desired`/`spec-sync`, cifrado, y helpers
+  de `src/lib` (zonas, certificados, estado, origen).
+- **Clientes de proveedores**: `http`/`cloudflare`/`cloudflare-rulesets`/`npm` con `fetch` mockeado;
+  `mikrotik`/`docker` con `node:http(s).request` mockeado (helper `test/http-request-fake.ts`).
+- **Orquestación**: `create`/`update`/`delete`/`reconcile`/`get`-domain, `list-domains`/`list-status`,
+  `docker`/`file` sync y la reconciliación de reglas de borde, con una DB falsa en memoria
+  (`test/fake-db.ts`) que emula la cadena de drizzle.
+
+Los tests viven junto al código como `*.test.ts`; el entorno hermético (vars de `env`, `SETTINGS_KEY`)
+se fija en `test/setup.ts`. Fuera de alcance: render de componentes Preact (necesitaría DOM) y los
+watchers (timers/eventos).
+
 Variables de entorno (dev en `.env`, no commitear):
 
 ```
